@@ -1,0 +1,29 @@
+plugins {
+    // java
+    id 'java'
+    id 'java-library'
+
+    // package publishing
+    id 'maven-publish'
+    id 'signing'
+
+    // for shading in dependencies
+    id "com.github.johnrengelman.shadow" version "7.1.2"
+}
+
+/* artifact properties */
+version '1.0.0'
+
+/* module properties/configuration */
+ext {
+    hasTesting = true
+    desc = "Aspen core"
+}
+
+/* apply buildsrc script */ 
+apply from: '../buildsrc/module.gradle', to: project
+
+dependencies {
+    implementation 'org.jetbrains:annotations:24.0.0'
+    implementation 'org.yaml:snakeyaml:1.33'
+}

@@ -1,0 +1,14 @@
+group 'net.orbyfied.aspen'
+
+ext {
+
+    // minecraft
+    paperVersion = "1.19.2-R0.1-20221119.041019-155"
+
+    // publishing
+    projectUrl = "https://github.com/cold-collective/aspen"
+    scmBaseUrl = "github.com/cold-collective/aspen.git"
+    licenses   = new String[] { "Apache License 2.0;https://www.apache.org/licenses/LICENSE-2.0" } as String[]
+    developers = new String[] { "orbyfied;orbyfied" }
+
+}
