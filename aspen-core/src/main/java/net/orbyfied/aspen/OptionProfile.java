@@ -107,9 +107,16 @@ public record OptionProfile(ConfigurationProvider provider,
             if (!section.contains(key))
                 continue;
 
+            property.schema = schema;
+
+            /* special properties */
+            if (property instanceof SectionProperty sectionProperty) {
+                loadSchema(sectionProperty.get(), section.section(key));
+                continue;
+            }
+
             Object primVal = section.get(key);
             Object val = property.valueFromPrimitive(primVal);
-            property.schema = schema;
 
             property.set(val);
         }
@@ -120,11 +127,6 @@ public record OptionProfile(ConfigurationProvider provider,
                 loadSchema(childSchema, section);
             }
         }
-
-        // load all sections
-        for (Schema sectionSchema : schema.sections.values()) {
-            loadSchema(sectionSchema, section.section(sectionSchema.name));
-        }
     }
 
     // save the given schema/section
@@ -134,6 +136,12 @@ public record OptionProfile(ConfigurationProvider provider,
         // save all properties
         for (Property property : schema.propertyMap.values()) {
             property.schema = schema;
+
+            /* special properties */
+            if (property instanceof SectionProperty sectionProperty) {
+                saveSchema(sectionProperty.get(), section.section(property.name));
+                continue;
+            }
 
             Object val = property.get();
             Object primVal = property.valueToPrimitive(val);
@@ -146,12 +154,6 @@ public record OptionProfile(ConfigurationProvider provider,
             for (OptionSchema childSchema : optionSchema.providedChildren) {
                 saveSchema(childSchema, section);
             }
-        }
-
-        // save all sections
-        for (Schema sectionSchema : schema.sections.values()) {
-            saveSchema(sectionSchema,
-                    section.section(sectionSchema.name));
         }
     }
 

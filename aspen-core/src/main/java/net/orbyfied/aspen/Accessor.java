@@ -16,6 +16,20 @@ import java.lang.reflect.Field;
  */
 public interface Accessor<T> {
 
+    static <T> Accessor<T> special(T value) {
+        return new Accessor<>() {
+            @Override
+            public T get(Schema schema, Property<T, ?> property) {
+                return value;
+            }
+
+            @Override
+            public void set(Schema schema, Property<T, ?> property, T value) {
+
+            }
+        };
+    }
+
     static <T> Accessor<T> memoryLocal() {
         return new Accessor<>() {
             // the value
@@ -46,6 +60,24 @@ public interface Accessor<T> {
             @Override
             public void set(Schema schema, Property<T, ?> property, T value) {
                 unsafe.putObjectVolatile(schema.instance, offset, value);
+            }
+        };
+    }
+
+    @SuppressWarnings("unchecked")
+    static <T> Accessor<T> foreignField(Schema source,
+                                        Field field) {
+        final Unsafe unsafe = UnsafeUtil.getUnsafe();
+        final long offset = unsafe.objectFieldOffset(field);
+        return new Accessor<>() {
+            @Override
+            public T get(Schema schema, Property<T, ?> property) {
+                return (T) unsafe.getObjectVolatile(source.instance, offset);
+            }
+
+            @Override
+            public void set(Schema schema, Property<T, ?> property, T value) {
+                unsafe.putObjectVolatile(source.instance, offset, value);
             }
         };
     }

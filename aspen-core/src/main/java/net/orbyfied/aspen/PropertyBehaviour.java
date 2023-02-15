@@ -15,6 +15,4 @@ public record PropertyBehaviour<T, P>(Class<T> complexClass, Class<P> primitiveC
                                       Function<T, P> t2pConverter,
                                       Function<P, T> p2tConverter) {
 
-
-
 }

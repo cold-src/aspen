@@ -7,9 +7,7 @@ import net.orbyfied.aspen.properties.SimpleProperty;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 /**
  * A compilable schema holding properties
@@ -35,13 +33,10 @@ public abstract class Schema implements NodeLike {
     protected final String name;
 
     // the parent schema
-    protected final Schema parent;
+    protected Schema parent;
 
     // the properties compiled
     protected final Map<String, Property> propertyMap = new HashMap<>();
-
-    // the child sections
-    protected final Map<String, Schema> sections = new HashMap<>();
 
     /**
      * The comment on this schema.
@@ -75,8 +70,13 @@ public abstract class Schema implements NodeLike {
         return Collections.unmodifiableMap(propertyMap);
     }
 
+    public Property getProperty(String name) {
+        return propertyMap.get(name);
+    }
+
     public Schema withProperty(Property property) {
         propertyMap.put(property.name, property);
+        property.schema = this;
         return this;
     }
 
@@ -116,13 +116,11 @@ public abstract class Schema implements NodeLike {
         return curr;
     }
 
-    public Schema withSection(Schema schema) {
-        sections.put(schema.name, schema);
-        return this;
-    }
-
     public Schema getSectionFlat(String name) {
-        return sections.get(name);
+        Property property = propertyMap.get(name);
+        if (property == null || property.getClass() != SectionProperty.class)
+            return null;
+        return ((SectionProperty) property).get();
     }
 
     /**
@@ -177,29 +175,36 @@ public abstract class Schema implements NodeLike {
             }
 
             // check for option
-            if (property == null &&
-                    field.isAnnotationPresent(Option.class)) {
-                Option optionDesc = field.getAnnotation(Option.class);
-                String name;
-                if (optionDesc.name().equals("(get)")) {
-                    name = field.getName();
-                } else {
-                    name = optionDesc.name();
+            if (provider.processAnnotations()) {
+                if (property == null &&
+                        field.isAnnotationPresent(Option.class)) {
+                    Option optionDesc = field.getAnnotation(Option.class);
+                    String name;
+                    if (optionDesc.name().equals("(get)")) {
+                        name = field.getName();
+                    } else {
+                        name = optionDesc.name();
+                    }
+
+                    Class<?> type = checkPropertyType(field.getType());
+
+                    // create property
+                    OptionProcessor processor = provider.findProcessorPipeline(this, type);
+                    Property.Builder builder = processor.open(
+                            provider, this, name, type,
+                            field
+                    );
+                    builder.accessor(Accessor.foreignField(this, field));
+                    processor.configure(provider, this, field, builder);
+                    property = builder.build();
+
+                    withProperty(property);
                 }
 
-                Class<?> type = checkPropertyType(field.getType());
+                if (property != null) {
+                    property.schema = this;
+                }
 
-                // create property
-                property = provider.buildTypedProperty(
-                        SimpleProperty.builder(name, type)
-                                .accessor(Accessor.forField(field))
-                );
-
-                withProperty(property);
-            }
-
-            if (property != null) {
-                property.schema = this;
             }
 
             // check for section
@@ -216,10 +221,11 @@ public abstract class Schema implements NodeLike {
                     field.set(this.instance, instance);
                 }
 
-                SectionSchema schema =
-                        new SectionSchema(this, name, instance);
-                schema.compile(provider);
-                withSection(schema);
+                withProperty(
+                        SectionProperty.builder(name, instance.getClass())
+                        .instance(instance)
+                        .build()
+                );
             }
         }
 

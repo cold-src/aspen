@@ -4,11 +4,20 @@ import net.orbyfied.aspen.annotation.Defaults;
 import net.orbyfied.aspen.annotation.Docs;
 import net.orbyfied.aspen.properties.EnumStringProperty;
 import net.orbyfied.aspen.properties.ListArrayProperty;
+import net.orbyfied.aspen.properties.SimpleProperty;
+import net.orbyfied.aspen.util.Pair;
 import net.orbyfied.aspen.util.Throwables;
 
+import java.lang.reflect.Field;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 /**
  * Main manager/service provider for the
@@ -19,11 +28,192 @@ import java.util.Map;
 @SuppressWarnings({ "unchecked", "rawtypes" })
 public class ConfigurationProvider {
 
+    static <P extends Property, B extends Property.Builder>
+    OptionProcessor<P, B> builtInProcessor(int exactness,
+                                           Predicate<Class<?>> predicate,
+                                           BiFunction<String, Class<?>, B> opener,
+                                           Consumer<B> configureFunc) {
+        return new OptionProcessor<P, B>() {
+            @Override
+            public int exactness() {
+                return exactness;
+            }
+
+            @Override
+            public boolean matches(ConfigurationProvider provider, Schema schema, Class<?> type) {
+                return predicate.test(type);
+            }
+
+            @Override
+            public B open(ConfigurationProvider provider, Schema schema, String name, Class<?> type, Field field) throws Exception {
+                return opener.apply(name, type);
+            }
+
+            @Override
+            public void configure(ConfigurationProvider provider, Schema schema, Field field, B builder) throws Exception {
+                configureFunc.accept(builder);
+            }
+        };
+    }
+
+    static final OptionProcessor BASE_OPTION_PROCESSOR = new OptionProcessor() {
+        @Override
+        public int exactness() {
+            return Integer.MAX_VALUE;
+        }
+
+        @Override
+        public boolean matches(ConfigurationProvider provider, Schema schema, Class type) {
+            return true;
+        }
+
+        @Override
+        public Property.Builder open(ConfigurationProvider provider, Schema schema, String name, Class type, Field field) throws Exception {
+            return SimpleProperty.builder(name, type);
+        }
+
+        @Override
+        public void configure(ConfigurationProvider provider, Schema schema, Field field, Property.Builder builder) throws Exception {
+
+        }
+    };
+
+    /*
+        Global Providers
+     */
+
+    static final List<Pair<Predicate<Class<?>>, ConfigurationProvider>> GLOBAL_PROVIDERS =
+            new ArrayList<>();
+    static final Map<Class<?>, ConfigurationProvider> GLOBAL_PROVIDER_CACHE =
+            new HashMap<>();
+
+    /**
+     * Create a new global provider for all classes
+     * matching the given predicate.
+     *
+     * @param predicate The predicate.
+     * @return The provider.
+     */
+    public static ConfigurationProvider newGlobal(Predicate<Class<?>> predicate) {
+        ConfigurationProvider provider = new ConfigurationProvider();
+        GLOBAL_PROVIDERS.add(new Pair<>(predicate, provider));
+        return provider;
+    }
+
+    /**
+     * Creates a new configuration provider for
+     * all classes under the given package.
+     *
+     * @param packageName The package name.
+     * @return The provider.
+     */
+    public static ConfigurationProvider newGlobalUnderPackage(final String packageName) {
+        final String fName;
+        if (!packageName.endsWith("."))
+            fName = packageName + ".";
+        else
+            fName = packageName;
+        return newGlobal(klass -> klass.getName().startsWith(fName));
+    }
+
+    /**
+     * Get a global configuration provider for the
+     * given class.
+     *
+     * Indexes the cache first.
+     *
+     * @param klass The class to find for.
+     * @return The provider or null if absent.
+     */
+    public static ConfigurationProvider getGlobal(Class<?> klass) {
+        ConfigurationProvider provider = GLOBAL_PROVIDER_CACHE.get(klass);
+        if (provider != null) {
+            return provider;
+        }
+
+        for (Pair<Predicate<Class<?>>, ConfigurationProvider> pair : GLOBAL_PROVIDERS) {
+            if (pair.first.test(klass)) {
+                provider = pair.second;
+                GLOBAL_PROVIDER_CACHE.put(klass, provider);
+                return provider;
+            }
+        }
+
+        return null;
+    }
+
+    ///////////////////////////////////
+
+    /* settings */
+    boolean processAnnotations = true;
+
+    // the registered option processors
+    private final List<OptionProcessor> optionProcessors = new ArrayList<>();
+
     // the registered property behaviours
     private final Map<Class<?>, PropertyBehaviour> propertyBehaviourMap = new HashMap<>();
 
     // the registered profiles
     private final Map<String, OptionProfile> profileMap = new HashMap<>();
+
+
+
+    {
+        /* default option processors */
+        withOptionProcessor(builtInProcessor(
+                10,
+                Number.class::isAssignableFrom,
+                (name, type) -> /* todo */ null,
+                builder -> {
+
+                }
+        ));
+    }
+
+    /* Settings */
+
+    public ConfigurationProvider processAnnotations(boolean b) {
+        this.processAnnotations = b;
+        return this;
+    }
+
+    public boolean processAnnotations() {
+        return processAnnotations;
+    }
+
+    /**
+     * Register a new option processor to this
+     * configuration provider.
+     *
+     * @param processor The option processor.
+     * @return This.
+     */
+    public ConfigurationProvider withOptionProcessor(OptionProcessor processor) {
+        optionProcessors.add(processor);
+        return this;
+    }
+
+    /**
+     * Finds the correct option processors for
+     * the given type and builds a pipeline.
+     *
+     * @param schema The schema for context.
+     * @param type The type.
+     * @return The pipeline.
+     */
+    public OptionProcessor findProcessorPipeline(Schema schema, Class<?> type) {
+        List<OptionProcessor> processors = new ArrayList<>();
+        for (OptionProcessor processor : this.optionProcessors) {
+            if (processor.matches(
+                    this, schema,
+                    type
+            )) {
+                processors.add(processor);
+            }
+        }
+
+        return OptionProcessor.orderedPipeline(processors);
+    }
 
     /**
      * Get a registered option profile by
@@ -116,6 +306,7 @@ public class ConfigurationProvider {
      * @param builder The builder.
      * @return The special property or the default if no special behaviour could be found.
      */
+    @Deprecated
     public <T, P> Property<T, P> buildTypedProperty(Property.Builder builder) {
         PropertyBehaviour<T, P> behaviour = getPropertyBehaviour(builder.complexType);
         if (behaviour == null) {
