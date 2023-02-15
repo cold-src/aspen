@@ -50,6 +50,7 @@ public class OptionSchema extends Schema {
 
         for (Field field : klass.getDeclaredFields()) {
             if (Modifier.isStatic(field.getModifiers())) continue;
+            field.setAccessible(true);
 
             {
                 Options desc = field.getAnnotation(Options.class);
@@ -59,7 +60,9 @@ public class OptionSchema extends Schema {
                     if (chInstance == null) {
                         Constructor<?> constructor = field.getType()
                                 .getDeclaredConstructor();
+                        constructor.setAccessible(true);
                         chInstance = constructor.newInstance();
+                        field.set(this.instance, chInstance);
                     }
 
                     OptionSchema schema = new OptionSchema(this, chInstance);

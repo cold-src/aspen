@@ -2,7 +2,9 @@ package net.orbyfied.aspen;
 
 import net.orbyfied.aspen.annotation.Option;
 import net.orbyfied.aspen.annotation.Section;
+import net.orbyfied.aspen.properties.SimpleProperty;
 
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.Collections;
@@ -114,6 +116,11 @@ public abstract class Schema implements NodeLike {
         return curr;
     }
 
+    public Schema withSection(Schema schema) {
+        sections.put(schema.name, schema);
+        return this;
+    }
+
     public Schema getSectionFlat(String name) {
         return sections.get(name);
     }
@@ -154,20 +161,24 @@ public abstract class Schema implements NodeLike {
     public Schema compile(ConfigurationProvider provider) throws Exception {
         for (Field field : klass.getDeclaredFields()) {
             if (Modifier.isStatic(field.getModifiers())) continue;
+            field.setAccessible(true);
 
-            Property property; // result property
+            Property property = null; // result property
 
             // check for explicit property
             if (Property.class.isAssignableFrom(field.getType())) {
                 property = (Property) field.get(instance);
                 if (property == null) continue;
+                if (property.accessor == null) {
+                    property.accessor = Accessor.memoryLocal();
+                }
 
                 withProperty(property);
-                continue;
             }
 
             // check for option
-            if (field.isAnnotationPresent(Option.class)) {
+            if (property == null &&
+                    field.isAnnotationPresent(Option.class)) {
                 Option optionDesc = field.getAnnotation(Option.class);
                 String name;
                 if (optionDesc.name().equals("(get)")) {
@@ -180,19 +191,35 @@ public abstract class Schema implements NodeLike {
 
                 // create property
                 property = provider.buildTypedProperty(
-                        Property
-                                .simpleBuilder(name, type)
+                        SimpleProperty.builder(name, type)
                                 .accessor(Accessor.forField(field))
                 );
 
                 withProperty(property);
+            }
 
-                continue;
+            if (property != null) {
+                property.schema = this;
             }
 
             // check for section
             if (field.isAnnotationPresent(Section.class)) {
+                Class<?> klass = field.getType();
+                String name = field.getAnnotation(Section.class).name();
 
+                Object instance = field.get(this.instance);
+                if (instance == null) {
+                    Constructor constructor =
+                            klass.getDeclaredConstructor();
+                    constructor.setAccessible(true);
+                    instance = constructor.newInstance();
+                    field.set(this.instance, instance);
+                }
+
+                SectionSchema schema =
+                        new SectionSchema(this, name, instance);
+                schema.compile(provider);
+                withSection(schema);
             }
         }
 

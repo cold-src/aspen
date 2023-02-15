@@ -23,3 +23,7 @@ gradle/wrapper/gradle-wrapper.properties
 /gradle.properties
 /secret-keys.gpg
 /secret-keys.gpg
+
+# test
+.test/
+.test

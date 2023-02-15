@@ -13,13 +13,13 @@ import net.orbyfied.aspen.Property;
 @SuppressWarnings({ "rawtypes", "unchecked" })
 public class EnumStringProperty<T extends Enum> extends Property<T, String> {
 
-    public static class Builder<T extends Enum> extends Property.Builder<T, String, Builder<T>> {
+    public static class Builder<T extends Enum> extends Property.Builder<T, String, Builder<T>, EnumStringProperty<T>> {
         protected Builder(String name, Class<T> complexType, Class<String> primitiveType) {
             super(name, complexType, primitiveType);
         }
 
         @Override
-        public Property<T, String> build() {
+        public EnumStringProperty<T> build() {
             return new EnumStringProperty<>(
                     name,
                     complexType,

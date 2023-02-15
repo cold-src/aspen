@@ -30,31 +30,6 @@ import org.jetbrains.annotations.Contract;
 public class Property<T, P> implements NodeLike {
 
     /**
-     * Create a builder for a standard property.
-     */
-    public static <T> SimpleBuilder<T> simpleBuilder(final String name,
-                                                                     final Class<T> tClass) {
-        return new SimpleBuilder<>(name, tClass);
-    }
-
-    static class SimpleBuilder<T> extends Builder<T, T, SimpleBuilder<T>> {
-        protected SimpleBuilder(String name, Class<T> complexType) {
-            super(name, complexType, complexType);
-        }
-
-        @Override
-        public Property<T, T> build() {
-            return new Property<>(
-                    name,
-                    complexType,
-                    primitiveType,
-                    comment,
-                    accessor
-            );
-        }
-    }
-
-    /**
      * Builder classifier for typed properties, which need
      * to be mappable to special property types.
      */
@@ -63,7 +38,7 @@ public class Property<T, P> implements NodeLike {
     }
 
     /** Builder Class */
-    public static abstract class Builder<T, P, S> {
+    public static abstract class Builder<T, P, S, R extends Property<T, P>> {
 
         /* properties */
         protected final String name;
@@ -101,7 +76,7 @@ public class Property<T, P> implements NodeLike {
          *
          * @return The property.
          */
-        public abstract Property<T, P> build();
+        public abstract R build();
 
     }
 
@@ -120,7 +95,10 @@ public class Property<T, P> implements NodeLike {
     protected final String comment;
 
     // the value accessor
-    protected final Accessor<T> accessor;
+    protected Accessor<T> accessor;
+
+    // the schema this property is located in
+    protected Schema schema;
 
     /**
      * Constructor for builders.
@@ -148,6 +126,10 @@ public class Property<T, P> implements NodeLike {
                         type.getName() + " -> P:" + primitiveType.getName());
             }
         }
+    }
+
+    public Schema getSchema() {
+        return schema;
     }
 
     // fail parsing of the property
@@ -187,6 +169,14 @@ public class Property<T, P> implements NodeLike {
      */
     public P valueToPrimitive(T value) {
         return (P) value;
+    }
+
+    public T get() {
+        return accessor.get(schema, this);
+    }
+
+    public void set(T value) {
+        accessor.set(schema, this, value);
     }
 
     /* Getters */

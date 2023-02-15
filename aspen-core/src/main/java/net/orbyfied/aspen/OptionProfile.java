@@ -4,6 +4,7 @@ import net.orbyfied.aspen.raw.Configuration;
 import net.orbyfied.aspen.raw.ConfigurationSection;
 import org.yaml.snakeyaml.Yaml;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.logging.Logger;
 
@@ -52,27 +53,27 @@ public record OptionProfile(ConfigurationProvider provider,
      * Load the options from the persistent
      * storage file.
      *
-     * @return True if successful, false otherwise.
+     * @return This.
+     * @throws IllegalStateException If an error occurs.
      */
-    public boolean load() {
+    public OptionProfile load() {
         try {
             if (defaults != null) {
                 configuration.reloadOrDefaultThrowing(defaults);
             } else {
-                configuration.reload();
+                if (Files.exists(file)) {
+                    configuration.reload();
+                }
             }
 
             loadSchema(schema, configuration);
 
             // re-save defaults to update
-            saveSchema(schema, configuration);
+            save();
 
-            return true;
+            return this;
         } catch (Exception e) {
-            LOGGER.severe("Failed to load options for profile(" + name + ") file(" + file + ")");
-            e.printStackTrace();
-
-            return false;
+            throw new IllegalStateException("Profile '" + name + "' load failed file(" + file + ")");
         }
     }
 
@@ -80,18 +81,19 @@ public record OptionProfile(ConfigurationProvider provider,
      * Saves the options to the persistent
      * storage file.
      *
-     * @return Success.
+     * @return This.
+     * @throws IllegalStateException If an error occurs.
      */
-    public boolean save() {
+    public OptionProfile save() {
         try {
             saveSchema(schema, configuration);
 
-            return true;
-        } catch (Exception e) {
-            LOGGER.severe("Failed to save options for profile(" + name + ") file(" + file + ")");
-            e.printStackTrace();
+            // save to file
+            configuration.save();
 
-            return false;
+            return this;
+        } catch (Exception e) {
+            throw new IllegalStateException("Profile '" + name + "' load failed file(" + file + ")");
         }
     }
 
@@ -107,8 +109,9 @@ public record OptionProfile(ConfigurationProvider provider,
 
             Object primVal = section.get(key);
             Object val = property.valueFromPrimitive(primVal);
+            property.schema = schema;
 
-            property.getAccessor().set(schema, val);
+            property.set(val);
         }
 
         // load all option sections
@@ -130,7 +133,9 @@ public record OptionProfile(ConfigurationProvider provider,
                               ConfigurationSection section) {
         // save all properties
         for (Property property : schema.propertyMap.values()) {
-            Object val = property.accessor.get(schema);
+            property.schema = schema;
+
+            Object val = property.get();
             Object primVal = property.valueToPrimitive(val);
 
             section.set(property.name, primVal);

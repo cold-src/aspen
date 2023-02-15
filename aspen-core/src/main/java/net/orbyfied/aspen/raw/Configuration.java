@@ -1,6 +1,8 @@
 package net.orbyfied.aspen.raw;
 
 import net.orbyfied.aspen.util.Throwables;
+import org.yaml.snakeyaml.DumperOptions;
+import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.*;
@@ -19,7 +21,22 @@ import java.util.function.Supplier;
 @SuppressWarnings({ "unchecked", "rawtypes" })
 public class Configuration implements ConfigurationSection {
 
-    static final Yaml YAML = new Yaml();
+    static final Yaml YAML;
+    static final LoaderOptions LOADER_OPTIONS = new LoaderOptions();
+    static final DumperOptions DUMPER_OPTIONS = new DumperOptions();
+
+    static {
+        LOADER_OPTIONS.setProcessComments(true);
+        LOADER_OPTIONS.setEnumCaseSensitive(false);
+
+        DUMPER_OPTIONS.setAllowUnicode(true);
+        DUMPER_OPTIONS.setPrettyFlow(true);
+        DUMPER_OPTIONS.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
+        DUMPER_OPTIONS.setProcessComments(true);
+
+        YAML = new Yaml(DUMPER_OPTIONS);
+        YAML.setName("Configuration");
+    }
 
     ///////////////////////////////////////////////////////
 
