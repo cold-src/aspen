@@ -8,9 +8,12 @@ import java.lang.annotation.Target;
 /**
  * Specify a number range for an
  * option.
+ *
+ * todo: implement
+ *  for now use @MinMax
  */
 @Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.FIELD)
+@Target({ ElementType.FIELD, ElementType.TYPE_USE })
 public @interface Range {
 
     /**

@@ -4,6 +4,7 @@ import net.orbyfied.aspen.util.UnsafeUtil;
 import sun.misc.Unsafe;
 
 import java.lang.reflect.Field;
+import java.util.function.Supplier;
 
 /**
  * Provides an accessor for properties
@@ -27,6 +28,11 @@ public interface Accessor<T> {
             public void register(Schema schema, Property<T, ?> property, T value) {
 
             }
+
+            @Override
+            public boolean has(Schema schema, Property<T, ?> property) {
+                return true;
+            }
         };
     }
 
@@ -34,6 +40,8 @@ public interface Accessor<T> {
         return new Accessor<>() {
             // the value
             T val;
+            // if it is set
+            boolean set = false;
 
             @Override
             public T get(Schema schema, Property<T, ?> property) {
@@ -43,33 +51,25 @@ public interface Accessor<T> {
             @Override
             public void register(Schema schema, Property<T, ?> property, T value) {
                 val = value;
+                set = true;
+            }
+
+            @Override
+            public boolean has(Schema schema, Property<T, ?> property) {
+                return set;
             }
         };
     }
 
     @SuppressWarnings("unchecked")
-    static <T> Accessor<T> forField(Field field) {
+    static <T> Accessor<T> forField(Schema source,
+                                    Field field) {
         final Unsafe unsafe = UnsafeUtil.getUnsafe();
         final long offset = unsafe.objectFieldOffset(field);
         return new Accessor<>() {
-            @Override
-            public T get(Schema schema, Property<T, ?> property) {
-                return (T) unsafe.getObjectVolatile(schema.instance, offset);
-            }
+            // if a value has been set
+            boolean set = false;
 
-            @Override
-            public void register(Schema schema, Property<T, ?> property, T value) {
-                unsafe.putObjectVolatile(schema.instance, offset, value);
-            }
-        };
-    }
-
-    @SuppressWarnings("unchecked")
-    static <T> Accessor<T> foreignField(Schema source,
-                                        Field field) {
-        final Unsafe unsafe = UnsafeUtil.getUnsafe();
-        final long offset = unsafe.objectFieldOffset(field);
-        return new Accessor<>() {
             @Override
             public T get(Schema schema, Property<T, ?> property) {
                 return (T) unsafe.getObjectVolatile(source.instance, offset);
@@ -78,6 +78,59 @@ public interface Accessor<T> {
             @Override
             public void register(Schema schema, Property<T, ?> property, T value) {
                 unsafe.putObjectVolatile(source.instance, offset, value);
+                set = true;
+            }
+
+            @Override
+            public boolean has(Schema schema, Property<T, ?> property) {
+                return set;
+            }
+        };
+    }
+
+    static <T> Accessor<T> defaulted(Accessor<T> accessor,
+                                     Supplier<T> defSupplier) {
+        if (defSupplier == null)
+            return accessor;
+        return new Accessor<>() {
+            @Override
+            public T get(Schema schema, Property<T, ?> property) {
+                if (!accessor.has(schema, property)) {
+                    T t = defSupplier.get();
+                    register(schema, property, t);
+                    return t;
+                }
+
+                return accessor.get(schema, property);
+            }
+
+            @Override
+            public void register(Schema schema, Property<T, ?> property, T value) {
+                accessor.register(schema, property, value);
+            }
+
+            @Override
+            public boolean has(Schema schema, Property<T, ?> property) {
+                return accessor.has(schema, property);
+            }
+        };
+    }
+
+    static <T> Accessor<T> dynamic(Supplier<Accessor<T>> supplier) {
+        return new Accessor<>() {
+            @Override
+            public T get(Schema schema, Property<T, ?> property) {
+                return supplier.get().get(schema, property);
+            }
+
+            @Override
+            public void register(Schema schema, Property<T, ?> property, T value) {
+                supplier.get().register(schema, property, value);
+            }
+
+            @Override
+            public boolean has(Schema schema, Property<T, ?> property) {
+                return supplier.get().has(schema, property);
             }
         };
     }
@@ -106,5 +159,15 @@ public interface Accessor<T> {
      * @param value The value to register.
      */
     void register(Schema schema, Property<T, ?> property, T value);
+
+    /**
+     * If this accessor can access a value
+     * in the given context.
+     *
+     * @param schema The schema.
+     * @param property The property.
+     * @return True/false.
+     */
+    boolean has(Schema schema, Property<T, ?> property);
 
 }

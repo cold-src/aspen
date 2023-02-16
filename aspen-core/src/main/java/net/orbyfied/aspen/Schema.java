@@ -94,7 +94,6 @@ public abstract class Schema implements NodeLike {
         return this;
     }
 
-    @Override
     public String getComment() {
         return comment;
     }
@@ -201,7 +200,7 @@ public abstract class Schema implements NodeLike {
                             provider, this, name, type,
                             field
                     );
-                    builder.accessor(Accessor.foreignField(this, field));
+                    builder.accessor(Accessor.forField(this, field));
                     processor.configure(provider, this, field, builder);
                     property = builder.build();
 
@@ -229,10 +228,8 @@ public abstract class Schema implements NodeLike {
                 }
 
                 withProperty(
-                        SectionProperty.builder(name, instance.getClass())
-                                .provider(provider)
-                                .instance(instance)
-                                .build()
+                        SectionProperty.builder(provider, name, klass, instance)
+                        .build()
                 );
             }
         }

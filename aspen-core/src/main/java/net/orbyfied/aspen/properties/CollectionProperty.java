@@ -1,6 +1,5 @@
 package net.orbyfied.aspen.properties;
 
-import net.orbyfied.aspen.Accessor;
 import net.orbyfied.aspen.Property;
 import net.orbyfied.aspen.raw.ListNode;
 import net.orbyfied.aspen.raw.ValueNode;
@@ -8,6 +7,7 @@ import net.orbyfied.aspen.raw.ValueNode;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.function.Supplier;
 
 /**
  * A property which embeds a list and
@@ -18,12 +18,26 @@ import java.util.List;
 @SuppressWarnings({ "rawtypes", "unchecked" })
 public abstract class CollectionProperty<E> extends Property<Collection<E>, List> {
 
+    public static <E> Builder<Collection<E>, List, CollectionProperty<E>> builder(String name, Property<E, ?> embedded,
+                                                                                  Supplier<Collection<E>> supplier) {
+        return new Builder<>(name, Collection.class, List.class, () -> new CollectionProperty<E>(embedded) {
+            @Override
+            protected Collection<E> newCollection() {
+                return supplier.get();
+            }
+        });
+    }
+
+    public static <E> Builder<Collection<E>, List, CollectionProperty<E>> arrayList(String name, Property<E, ?> embedded) {
+        return builder(name, embedded, ArrayList::new);
+    }
+
+    //////////////////////////////////////////////////
+
     // the embedded property
     Property embedded;
 
-    protected CollectionProperty(String name, String comment, Accessor<Collection<E>> accessor,
-                                 Property embedded) {
-        super(name, List.class, List.class, comment, accessor);
+    protected CollectionProperty(Property embedded) {
         this.embedded = embedded;
     }
 
@@ -54,7 +68,7 @@ public abstract class CollectionProperty<E> extends Property<Collection<E>, List
     }
 
     @Override
-    public ValueNode emitValue(Collection<E> value) {
+    protected ValueNode emitValue0(Collection<E> value) {
         ListNode node = new ListNode();
         for (E elem : value) {
             node.addElement(embedded.emitValue(elem));
@@ -64,7 +78,7 @@ public abstract class CollectionProperty<E> extends Property<Collection<E>, List
     }
 
     @Override
-    public Collection<E> loadValue(ValueNode node) {
+    protected Collection<E> loadValue0(ValueNode node) {
         if (!(node instanceof ListNode listNode))
             throw new IllegalStateException("Not a list node");
         Collection<E> collection = newCollection();

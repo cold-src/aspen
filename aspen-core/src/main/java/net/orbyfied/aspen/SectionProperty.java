@@ -12,30 +12,15 @@ import java.lang.reflect.Constructor;
 @SuppressWarnings({ "unchecked", "rawtypes" })
 public class SectionProperty extends Property<SectionSchema, Void> {
 
-    public static Builder builder(String name, Class<?> sectionClass) {
-        return new Builder(name, sectionClass);
-    }
-
-    public static class Builder extends Property.Builder<SectionSchema, Void, Builder, SectionProperty> {
-        protected Builder(String name, Class<?> sectionClass) {
-            super(name, SectionSchema.class, Void.class);
-            this.sectionClass = sectionClass;
-
-            provider = ConfigurationProvider.getGlobal(sectionClass);
-        }
-
-        // the section class
-        final Class<?> sectionClass;
-        Object sectionInstance;
-
-        public Builder instance(Object sectionInstance) {
-            this.sectionInstance = sectionInstance;
-            return this;
-        }
-
-        @Override
-        public SectionProperty build() {
+    public static Builder builder(
+            ConfigurationProvider provider,
+            String name,
+            Class<?> sectionClass,
+            final Object instance
+    ) {
+        return new Builder(name, sectionClass, Void.class, () -> {
             SectionSchema schema;
+            Object sectionInstance = instance;
             try {
                 if (sectionInstance == null) {
                     // create instance
@@ -52,28 +37,25 @@ public class SectionProperty extends Property<SectionSchema, Void> {
             }
 
             return new SectionProperty(
-                    name,
-                    comment,
                     schema
             );
-        }
+        });
     }
 
     ///////////////////////////////////////////
 
-    protected SectionProperty(String name, String comment, SectionSchema schema) {
-        super(name, SectionSchema.class, Void.class, comment,
-                Accessor.special(schema));
+    protected SectionProperty(SectionSchema schema) {
+        accessor = Accessor.special(schema);
     }
 
     @Override
     public void load(ValueNode node) {
-        schema.load(node);
+        get().load(node);
     }
 
     @Override
     public ValueNode emit() {
-        return schema.emit();
+        return get().emit();
     }
 
 }

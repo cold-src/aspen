@@ -2,6 +2,7 @@ package net.orbyfied.aspen;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.function.BiConsumer;
 
 public interface SchemaComposer {
 
@@ -26,6 +27,25 @@ public interface SchemaComposer {
                 for (int i = list.size() - 1; i >= 0; i--) {
                     list.get(i).compose(provider, schema);
                 }
+            }
+        };
+    }
+
+    static SchemaComposer allExtend(Class<?> superType, BiConsumer<ConfigurationProvider, Schema> consumer) {
+        return new SchemaComposer() {
+            @Override
+            public int exactness() {
+                return 20;
+            }
+
+            @Override
+            public boolean matches(ConfigurationProvider provider, Schema schema) {
+                return superType.isAssignableFrom(schema.klass);
+            }
+
+            @Override
+            public void compose(ConfigurationProvider provider, Schema schema) throws Throwable {
+                consumer.accept(provider, schema);
             }
         };
     }

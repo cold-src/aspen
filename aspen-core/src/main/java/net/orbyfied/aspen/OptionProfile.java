@@ -3,9 +3,11 @@ package net.orbyfied.aspen;
 import net.orbyfied.aspen.exception.ConfigurationLoadException;
 import net.orbyfied.aspen.raw.MapNode;
 import net.orbyfied.aspen.raw.Node;
+import net.orbyfied.aspen.util.Throwables;
 
 import java.io.FileReader;
 import java.io.FileWriter;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.logging.Logger;
 
@@ -23,6 +25,24 @@ public record OptionProfile(ConfigurationProvider provider,
                             OptionSchema schema) {
 
     static final Logger LOGGER = Logger.getLogger("OptionProfile");
+
+    static Path createIfAbsent(Path path) {
+        try {
+            if (!Files.exists(path)) {
+                Path parent = path.getParent();
+                if (!Files.exists(parent)) {
+                    Files.createDirectories(parent);
+                }
+
+                Files.createFile(path);
+            }
+
+            return path;
+        } catch (Exception e) {
+            Throwables.sneakyThrow(e);
+            return path;
+        }
+    }
 
     ////////////////////////////////////
 
@@ -50,6 +70,9 @@ public record OptionProfile(ConfigurationProvider provider,
      * @throws IllegalStateException If an error occurs.
      */
     public OptionProfile load() {
+        if (!Files.exists(file)) // skip loading if the file is absent
+            return this;
+
         try (FileReader reader = new FileReader(file.toFile())) {
             // compose node
             Node node = provider.rawProvider().compose(reader);
@@ -59,12 +82,9 @@ public record OptionProfile(ConfigurationProvider provider,
             // load schema
             schema.load(mapNode);
 
-            // re-save defaults to update
-            save();
-
             return this;
         } catch (Exception e) {
-            throw new IllegalStateException("Profile '" + name + "' load failed file(" + file + ")");
+            throw new IllegalStateException("Profile '" + name + "' load failed file(" + file + ")", e);
         }
     }
 
@@ -76,7 +96,7 @@ public record OptionProfile(ConfigurationProvider provider,
      * @throws IllegalStateException If an error occurs.
      */
     public OptionProfile save() {
-        try (FileWriter writer = new FileWriter(file.toFile())) {
+        try (FileWriter writer = new FileWriter(createIfAbsent(file).toFile())) {
             // emit to node tree
             Node node = schema.emit();
 
@@ -85,7 +105,7 @@ public record OptionProfile(ConfigurationProvider provider,
 
             return this;
         } catch (Exception e) {
-            throw new IllegalStateException("Profile '" + name + "' load failed file(" + file + ")");
+            throw new IllegalStateException("Profile '" + name + "' save failed file(" + file + ")", e);
         }
     }
 

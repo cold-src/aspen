@@ -1,8 +1,16 @@
 package net.orbyfied.aspen;
 
 import net.orbyfied.aspen.exception.PropertyLoadException;
+import net.orbyfied.aspen.raw.Node;
 import net.orbyfied.aspen.raw.ValueNode;
 import org.jetbrains.annotations.Contract;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 /**
  * A property associated with a key in a
@@ -39,7 +47,7 @@ public class Property<T, P> implements NodeLike {
     }
 
     /** Builder Class */
-    public static abstract class Builder<T, P, S, R extends Property<T, P>> {
+    public static class Builder<T, P, R extends Property<T, P>> {
 
         /* properties */
         protected final String name;
@@ -48,93 +56,132 @@ public class Property<T, P> implements NodeLike {
 
         protected ConfigurationProvider provider;
 
-        protected String comment;
-        protected Accessor<T> accessor = /* todo: default accessor */ null;
+        protected Consumer<Node> commenter;
+        protected Accessor<T> accessor;
 
-        protected Builder(String name, Class<T> complexType, Class<P> primitiveType) {
+        protected List<PropertyComponent> components = new ArrayList<>();
+
+        protected Supplier<T> defaultValueSupplier;
+
+        // the instance factory
+        private final Supplier<R> factory;
+
+        public Builder(String name, Class complexType, Class primitiveType,
+                       Supplier<R> factory) {
             this.name = name;
             this.complexType = complexType;
             this.primitiveType = primitiveType;
+            this.factory = factory;
         }
 
-        // get this casted to S
-        protected final S self() {
-            return (S) this;
+        // creates a new anonymous builder
+        // for embedded values
+        public static <T, P, R extends Property<T, P>> Builder<T, P, R> newAnonymous(
+                Class<T> tClass, Class<P> pClass, Supplier<R> supplier
+        ) {
+            return new Builder<>("<anonymous>", tClass, pClass, supplier);
         }
 
         /* Properties */
 
-        public S provider(ConfigurationProvider provider) {
+        public Builder<T, P, R> with(PropertyComponent component) {
+            components.add(component);
+            return this;
+        }
+
+        public <C extends PropertyComponent> Builder<T, P, R> with(C component, Consumer<C> consumer) {
+            with(component);
+            consumer.accept(component);
+            return this;
+        }
+
+        public Builder<T, P, R> provider(ConfigurationProvider provider) {
             this.provider = provider;
-            return self();
+            return this;
         }
 
-        public S comment(String str) {
-            this.comment = str;
-            return self();
+        public Builder<T, P, R> commenter(Consumer<Node> commenter) {
+            this.commenter = commenter;
+            return this;
         }
 
-        public S accessor(Accessor<T> accessor) {
+        public Builder<T, P, R> accessor(Accessor<T> accessor) {
             this.accessor = accessor;
-            return self();
+            return this;
         }
 
-        /**
-         * Build the new property.
-         *
-         * @return The property.
-         */
-        public abstract R build();
+        public Builder<T, P, R> defaultValue(Supplier<T> supplier) {
+            this.defaultValueSupplier = supplier;
+            return this;
+        }
+
+        public Builder<T, P, R> defaultValue(T val) {
+            return defaultValue(() -> val);
+        }
+
+        public R build() {
+            // create instance
+            R property = factory.get();
+
+            // set properties
+            property.name = name;
+            property.primitiveType = primitiveType;
+            property.complexType = complexType;
+            if (property.accessor == null) property.accessor = accessor;
+            if (property.commenter == null) property.commenter = commenter;
+
+            // create defaulted accessor
+            property.actualAccessor = Accessor.defaulted(Accessor.dynamic(() -> property.accessor), defaultValueSupplier);
+
+            // add components
+            if (!components.isEmpty()) {
+                property.componentMap = new HashMap<>();
+                for (PropertyComponent component : components)
+                    property.componentMap.put(component.getClass(), component);
+            }
+
+            // check conversions between primitive
+            // and complex types
+            if (property.getClass() == Property.class /* no special impl */) {
+                if (!complexType.isAssignableFrom(primitiveType)) {
+                    throw new IllegalArgumentException("default property implementation does not support conversion between T:" +
+                            complexType.getName() + " -> P:" + primitiveType.getName());
+                }
+            }
+
+            return property;
+        }
 
     }
 
     //////////////////////////////////////////
 
     // the name of this property
-    protected final String name;
+    protected String name;
 
     // the value type of this property
-    protected final Class<T> type;
+    protected Class<T> complexType;
 
     // the primitive type to save as
-    protected final Class<P> primitiveType;
+    protected Class<P> primitiveType;
 
     // the comment in the generated file
-    protected final String comment;
+    protected Consumer<Node> commenter;
 
     // the value accessor
     protected Accessor<T> accessor;
+    protected Accessor<T> actualAccessor;
 
     // the schema this property is located in
     protected Schema schema;
 
+    // the components on this property
+    protected Map<Class<?>, PropertyComponent> componentMap;
+
     /**
      * Constructor for builders.
-     *
-     * By default (if the instance is instance of the
-     * default implementation) it will throw an error
-     * if the complex and primitive types are
-     * not equal, and just return the primitive
-     * back.
      */
-    protected Property(String name, Class<?> type,
-                       Class<?> primitiveType, String comment,
-                       Accessor<T> accessor) {
-        this.name = name;
-        this.type = (Class<T>) type;
-        this.primitiveType = (Class<P>) primitiveType;
-        this.comment = comment;
-        this.accessor = accessor;
-
-        // check conversions between primitive
-        // and complex types
-        if (getClass() == Property.class /* no special impl */) {
-            if (!type.isAssignableFrom(primitiveType)) {
-                throw new IllegalArgumentException("default property implementation does not support conversion between T:" +
-                        type.getName() + " -> P:" + primitiveType.getName());
-            }
-        }
-    }
+    protected Property() { }
 
     public Schema getSchema() {
         return schema;
@@ -147,7 +194,9 @@ public class Property<T, P> implements NodeLike {
         throw new PropertyLoadException(getClass().getSimpleName() + "(" + name + "): " + s);
     }
 
-
+    public <C extends PropertyComponent> C component(Class<C> cClass) {
+        return (C) componentMap.get(cClass);
+    }
 
     /**
      * Converts the primitive value to
@@ -182,11 +231,16 @@ public class Property<T, P> implements NodeLike {
     }
 
     public T get() {
-        return accessor.get(schema, this);
+        return actualAccessor.get(schema, this);
     }
 
     public void set(T value) {
-        accessor.register(schema, this, value);
+        actualAccessor.register(schema, this, value);
+    }
+
+    // load value impl
+    protected T loadValue0(ValueNode node) {
+        return valueFromPrimitive((P) node.getValue());
     }
 
     /**
@@ -199,7 +253,20 @@ public class Property<T, P> implements NodeLike {
      * @return The value.
      */
     public T loadValue(ValueNode node) {
-        return valueFromPrimitive((P) node.getValue());
+        T val = loadValue0(node);
+
+        // pass through components
+        for (PropertyComponent component : componentMap.values()) {
+            component.checkLoadedValue(val);
+        }
+
+        return val;
+    }
+
+    // emit value impl
+    protected ValueNode emitValue0(T value) {
+        P primitiveValue = valueToPrimitive(value);
+        return new ValueNode<>(primitiveValue);
     }
 
     /**
@@ -212,18 +279,20 @@ public class Property<T, P> implements NodeLike {
      * @return The node.
      */
     public ValueNode emitValue(T value) {
-        P primitiveValue = valueToPrimitive(value);
-        return new ValueNode<>(primitiveValue);
+        return emitValue0(value);
     }
 
     @Override
     public ValueNode emit() {
-        return emitValue(get());
+        Node node = emitValue0(get());
+        if (commenter != null)
+            commenter.accept(node);
+        return (ValueNode) node;
     }
 
     @Override
     public void load(ValueNode node) {
-        set(loadValue(node));
+        set(loadValue0(node));
     }
 
     /* Getters */
@@ -238,13 +307,8 @@ public class Property<T, P> implements NodeLike {
         return name;
     }
 
-    @Override
-    public String getComment() {
-        return comment;
-    }
-
-    public Class<T> getType() {
-        return type;
+    public Class<T> getComplexType() {
+        return complexType;
     }
 
     public Class<?> getPrimitiveType() {

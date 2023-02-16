@@ -16,4 +16,7 @@ include 'buildsrc'
 
 include 'aspen-core'
 include 'aspen-raw'
+include 'aspen-yml'
+include 'aspen-util'
 
+include 'aspen-all'

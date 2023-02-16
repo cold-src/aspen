@@ -21,12 +21,6 @@ public interface NodeLike {
     String getName();
 
     /**
-     * Get the comment to set.
-     * Null if none.
-     */
-    String getComment();
-
-    /**
      * Emit a node representing the
      * value of this node like.
      *

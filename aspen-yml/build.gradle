@@ -12,17 +12,18 @@ plugins {
 }
 
 /* artifact properties */
-version '1.0.1'
+version '1.0.0'
 
 /* module properties/configuration */
 ext {
     hasTesting = true
-    desc = "Aspen raw API"
+    desc = "Aspen YAML raw implementation using SnakeYAML"
 }
 
 /* apply buildsrc script */
 apply from: '../buildsrc/module.gradle', to: project
 
 dependencies {
-    implementation project(":aspen-util")
+    api project(":aspen-raw")
+    api 'org.yaml:snakeyaml:1.33'
 }

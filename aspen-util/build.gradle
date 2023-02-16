@@ -12,17 +12,17 @@ plugins {
 }
 
 /* artifact properties */
-version '1.0.1'
+version '1.0.0'
 
 /* module properties/configuration */
 ext {
     hasTesting = true
-    desc = "Aspen raw API"
+    desc = "Aspen internal utility module"
 }
 
 /* apply buildsrc script */
 apply from: '../buildsrc/module.gradle', to: project
 
 dependencies {
-    implementation project(":aspen-util")
+
 }
