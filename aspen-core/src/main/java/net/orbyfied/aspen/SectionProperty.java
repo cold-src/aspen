@@ -1,5 +1,6 @@
 package net.orbyfied.aspen;
 
+import net.orbyfied.aspen.raw.ValueNode;
 import net.orbyfied.aspen.util.Throwables;
 
 import java.lang.reflect.Constructor;
@@ -27,16 +28,8 @@ public class SectionProperty extends Property<SectionSchema, Void> {
         final Class<?> sectionClass;
         Object sectionInstance;
 
-        // the configuration provider
-        ConfigurationProvider provider;
-
         public Builder instance(Object sectionInstance) {
             this.sectionInstance = sectionInstance;
-            return this;
-        }
-
-        public Builder provider(ConfigurationProvider provider) {
-            this.provider = provider;
             return this;
         }
 
@@ -52,7 +45,7 @@ public class SectionProperty extends Property<SectionSchema, Void> {
 
                 // create schema
                 schema = new SectionSchema(null, name, sectionInstance);
-                schema.compile(provider);
+                schema.compose(provider);
             } catch (Exception e) {
                 Throwables.sneakyThrow(e);
                 return null;
@@ -71,6 +64,16 @@ public class SectionProperty extends Property<SectionSchema, Void> {
     protected SectionProperty(String name, String comment, SectionSchema schema) {
         super(name, SectionSchema.class, Void.class, comment,
                 Accessor.special(schema));
+    }
+
+    @Override
+    public void load(ValueNode node) {
+        schema.load(node);
+    }
+
+    @Override
+    public ValueNode emit() {
+        return schema.emit();
     }
 
 }

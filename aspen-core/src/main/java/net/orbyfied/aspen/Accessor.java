@@ -24,7 +24,7 @@ public interface Accessor<T> {
             }
 
             @Override
-            public void set(Schema schema, Property<T, ?> property, T value) {
+            public void register(Schema schema, Property<T, ?> property, T value) {
 
             }
         };
@@ -41,7 +41,7 @@ public interface Accessor<T> {
             }
 
             @Override
-            public void set(Schema schema, Property<T, ?> property, T value) {
+            public void register(Schema schema, Property<T, ?> property, T value) {
                 val = value;
             }
         };
@@ -58,7 +58,7 @@ public interface Accessor<T> {
             }
 
             @Override
-            public void set(Schema schema, Property<T, ?> property, T value) {
+            public void register(Schema schema, Property<T, ?> property, T value) {
                 unsafe.putObjectVolatile(schema.instance, offset, value);
             }
         };
@@ -76,7 +76,7 @@ public interface Accessor<T> {
             }
 
             @Override
-            public void set(Schema schema, Property<T, ?> property, T value) {
+            public void register(Schema schema, Property<T, ?> property, T value) {
                 unsafe.putObjectVolatile(source.instance, offset, value);
             }
         };
@@ -84,8 +84,27 @@ public interface Accessor<T> {
 
     ///////////////////////////////
 
+    /**
+     * Get the value of the property if
+     * present in the given context.
+     *
+     * @param schema The schema.
+     * @param property The property.
+     * @return The value if present.
+     */
     T get(Schema schema, Property<T, ?> property);
 
-    void set(Schema schema, Property<T, ?> property, T value);
+    /**
+     * Register a value.
+     *
+     * This may mean setting the value,
+     * appending for embedded properties,
+     * or anything else.
+     *
+     * @param schema The schema.
+     * @param property The property.
+     * @param value The value to register.
+     */
+    void register(Schema schema, Property<T, ?> property, T value);
 
 }

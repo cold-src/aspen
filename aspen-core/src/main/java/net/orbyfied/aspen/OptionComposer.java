@@ -2,7 +2,6 @@ package net.orbyfied.aspen;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
-import java.lang.reflect.Field;
 import java.util.Comparator;
 import java.util.List;
 import java.util.function.Consumer;
@@ -13,15 +12,15 @@ import java.util.function.Consumer;
  * fields.
  */
 @SuppressWarnings({ "rawtypes", "unchecked" })
-public interface OptionProcessor<P extends Property, B extends Property.Builder> {
+public interface OptionComposer<P extends Property, B extends Property.Builder> {
 
-    static OptionProcessor orderedPipeline(List<OptionProcessor> list) {
-        list.sort(Comparator.comparingInt(OptionProcessor::exactness));
+    static OptionComposer orderedPipeline(List<OptionComposer> list) {
+        list.sort(Comparator.comparingInt(OptionComposer::exactness));
         // always add base processor to the end
         // of the list (least exact)
-        list.add(ConfigurationProvider.BASE_OPTION_PROCESSOR);
+        list.add(ConfigurationProvider.BASE_OPTION_COMPOSER);
 
-        return new OptionProcessor() {
+        return new OptionComposer() {
             @Override
             public int exactness() {
                 return -1;
@@ -33,13 +32,13 @@ public interface OptionProcessor<P extends Property, B extends Property.Builder>
             }
 
             @Override
-            public Property.Builder open(ConfigurationProvider provider, Schema schema, String name, Class type, Field field) throws Exception {
+            public Property.Builder open(ConfigurationProvider provider, Schema schema, String name, Class type, AnnotatedElement field) throws Exception {
                 return list.get(0).open(
                         provider, schema, name, type, field);
             }
 
             @Override
-            public void configure(ConfigurationProvider provider, Schema schema, Field field, Property.Builder builder) throws Exception {
+            public void configure(ConfigurationProvider provider, Schema schema, AnnotatedElement field, Property.Builder builder) throws Exception {
                 for (int i = list.size() - 1; i >= 0; i--) {
                     list.get(i)
                             .configure(
@@ -63,7 +62,7 @@ public interface OptionProcessor<P extends Property, B extends Property.Builder>
     //////////////////////////////////////
 
     /**
-     * Get the exactness of this processor.
+     * Get the exactness of this composer.
      *
      * This means how many types this will
      * match compared to others.
@@ -73,7 +72,7 @@ public interface OptionProcessor<P extends Property, B extends Property.Builder>
     int exactness();
 
     /**
-     * If this processor is applicable to
+     * If this composer is applicable to
      * the given type in the given context.
      *
      * @param provider The provider.
@@ -91,7 +90,7 @@ public interface OptionProcessor<P extends Property, B extends Property.Builder>
      * context.
      *
      * This is only called on the most exact
-     * processor out of a pipeline.
+     * composer out of a pipeline.
      *
      * @param provider The provider.
      * @param schema The schema.
@@ -105,7 +104,7 @@ public interface OptionProcessor<P extends Property, B extends Property.Builder>
            Schema schema,
            String name,
            Class<?> type,
-           Field field) throws Exception;
+           AnnotatedElement field) throws Exception;
 
     /**
      * Configures the property.
@@ -118,7 +117,7 @@ public interface OptionProcessor<P extends Property, B extends Property.Builder>
      */
     void configure(ConfigurationProvider provider,
                    Schema schema,
-                   Field field,
+                   AnnotatedElement field,
                    B builder) throws Exception;
 
 }

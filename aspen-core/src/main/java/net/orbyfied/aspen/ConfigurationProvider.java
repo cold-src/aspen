@@ -5,16 +5,16 @@ import net.orbyfied.aspen.annotation.Docs;
 import net.orbyfied.aspen.properties.EnumStringProperty;
 import net.orbyfied.aspen.properties.ListArrayProperty;
 import net.orbyfied.aspen.properties.SimpleProperty;
+import net.orbyfied.aspen.raw.RawProvider;
 import net.orbyfied.aspen.util.Pair;
 import net.orbyfied.aspen.util.Throwables;
 
-import java.lang.reflect.Field;
+import java.lang.reflect.AnnotatedElement;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -29,11 +29,11 @@ import java.util.function.Predicate;
 public class ConfigurationProvider {
 
     static <P extends Property, B extends Property.Builder>
-    OptionProcessor<P, B> builtInProcessor(int exactness,
-                                           Predicate<Class<?>> predicate,
-                                           BiFunction<String, Class<?>, B> opener,
-                                           Consumer<B> configureFunc) {
-        return new OptionProcessor<P, B>() {
+    OptionComposer<P, B> builtInProcessor(int exactness,
+                                          Predicate<Class<?>> predicate,
+                                          BiFunction<String, Class<?>, B> opener,
+                                          Consumer<B> configureFunc) {
+        return new OptionComposer<P, B>() {
             @Override
             public int exactness() {
                 return exactness;
@@ -45,18 +45,18 @@ public class ConfigurationProvider {
             }
 
             @Override
-            public B open(ConfigurationProvider provider, Schema schema, String name, Class<?> type, Field field) throws Exception {
+            public B open(ConfigurationProvider provider, Schema schema, String name, Class<?> type, AnnotatedElement field) throws Exception {
                 return opener.apply(name, type);
             }
 
             @Override
-            public void configure(ConfigurationProvider provider, Schema schema, Field field, B builder) throws Exception {
+            public void configure(ConfigurationProvider provider, Schema schema, AnnotatedElement field, B builder) throws Exception {
                 configureFunc.accept(builder);
             }
         };
     }
 
-    static final OptionProcessor BASE_OPTION_PROCESSOR = new OptionProcessor() {
+    static final OptionComposer BASE_OPTION_COMPOSER = new OptionComposer() {
         @Override
         public int exactness() {
             return Integer.MAX_VALUE;
@@ -68,13 +68,30 @@ public class ConfigurationProvider {
         }
 
         @Override
-        public Property.Builder open(ConfigurationProvider provider, Schema schema, String name, Class type, Field field) throws Exception {
+        public Property.Builder open(ConfigurationProvider provider, Schema schema, String name, Class type, AnnotatedElement field) throws Exception {
             return SimpleProperty.builder(name, type);
         }
 
         @Override
-        public void configure(ConfigurationProvider provider, Schema schema, Field field, Property.Builder builder) throws Exception {
+        public void configure(ConfigurationProvider provider, Schema schema, AnnotatedElement field, Property.Builder builder) throws Exception {
 
+        }
+    };
+
+    static final SchemaComposer BASE_SCHEMA_COMPOSER = new SchemaComposer() {
+        @Override
+        public int exactness() {
+            return Integer.MAX_VALUE;
+        }
+
+        @Override
+        public boolean matches(ConfigurationProvider provider, Schema schema) {
+            return true;
+        }
+
+        @Override
+        public void compose(ConfigurationProvider provider, Schema schema) throws Throwable {
+            Schema.composeBase(provider, schema);
         }
     };
 
@@ -147,8 +164,8 @@ public class ConfigurationProvider {
     /* settings */
     boolean processAnnotations = true;
 
-    // the registered option processors
-    private final List<OptionProcessor> optionProcessors = new ArrayList<>();
+    // the raw provider to use
+    private RawProvider rawProvider = null;
 
     // the registered property behaviours
     private final Map<Class<?>, PropertyBehaviour> propertyBehaviourMap = new HashMap<>();
@@ -156,11 +173,15 @@ public class ConfigurationProvider {
     // the registered profiles
     private final Map<String, OptionProfile> profileMap = new HashMap<>();
 
+    // the registered option composers
+    private final List<OptionComposer> optionComposers = new ArrayList<>();
 
+    // the schema composers
+    private final List<SchemaComposer> schemaComposers = new ArrayList<>();
 
     {
         /* default option processors */
-        withOptionProcessor(builtInProcessor(
+        withOptionComposer(builtInProcessor(
                 10,
                 Number.class::isAssignableFrom,
                 (name, type) -> /* todo */ null,
@@ -171,6 +192,15 @@ public class ConfigurationProvider {
     }
 
     /* Settings */
+
+    public ConfigurationProvider rawProvider(RawProvider provider) {
+        this.rawProvider = provider;
+        return this;
+    }
+
+    public RawProvider rawProvider() {
+        return rawProvider;
+    }
 
     public ConfigurationProvider processAnnotations(boolean b) {
         this.processAnnotations = b;
@@ -188,22 +218,27 @@ public class ConfigurationProvider {
      * @param processor The option processor.
      * @return This.
      */
-    public ConfigurationProvider withOptionProcessor(OptionProcessor processor) {
-        optionProcessors.add(processor);
+    public ConfigurationProvider withOptionComposer(OptionComposer processor) {
+        optionComposers.add(processor);
+        return this;
+    }
+
+    public ConfigurationProvider removeOptionComposer(OptionComposer composer) {
+        optionComposers.remove(composer);
         return this;
     }
 
     /**
-     * Finds the correct option processors for
+     * Finds the correct option composers for
      * the given type and builds a pipeline.
      *
      * @param schema The schema for context.
      * @param type The type.
      * @return The pipeline.
      */
-    public OptionProcessor findProcessorPipeline(Schema schema, Class<?> type) {
-        List<OptionProcessor> processors = new ArrayList<>();
-        for (OptionProcessor processor : this.optionProcessors) {
+    public OptionComposer findOptionComposerPipeline(Schema schema, Class<?> type) {
+        List<OptionComposer> processors = new ArrayList<>();
+        for (OptionComposer processor : this.optionComposers) {
             if (processor.matches(
                     this, schema,
                     type
@@ -212,7 +247,28 @@ public class ConfigurationProvider {
             }
         }
 
-        return OptionProcessor.orderedPipeline(processors);
+        return OptionComposer.orderedPipeline(processors);
+    }
+
+    /**
+     * Finds the correct schema composers for
+     * the given schema and returns it as an
+     * ordered pipeline.
+     *
+     * @param schema The schema.
+     * @return The pipeline.
+     */
+    public SchemaComposer findSchemaComposerPipeline(Schema schema) {
+        List<SchemaComposer> composers = new ArrayList<>();
+        for (SchemaComposer composer : this.schemaComposers) {
+            if (composer.matches(
+                    this, schema
+            )) {
+                composers.add(composer);
+            }
+        }
+
+        return SchemaComposer.orderedPipeline(composers);
     }
 
     /**

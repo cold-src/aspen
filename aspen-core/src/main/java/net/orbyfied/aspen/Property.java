@@ -1,6 +1,7 @@
 package net.orbyfied.aspen;
 
 import net.orbyfied.aspen.exception.PropertyLoadException;
+import net.orbyfied.aspen.raw.ValueNode;
 import org.jetbrains.annotations.Contract;
 
 /**
@@ -26,7 +27,7 @@ import org.jetbrains.annotations.Contract;
  *
  * @author orbyfied
  */
-@SuppressWarnings({ "unchecked" })
+@SuppressWarnings({ "unchecked", "rawtypes" })
 public class Property<T, P> implements NodeLike {
 
     /**
@@ -45,6 +46,8 @@ public class Property<T, P> implements NodeLike {
         protected final Class<T> complexType;
         protected final Class<P> primitiveType;
 
+        protected ConfigurationProvider provider;
+
         protected String comment;
         protected Accessor<T> accessor = /* todo: default accessor */ null;
 
@@ -60,6 +63,11 @@ public class Property<T, P> implements NodeLike {
         }
 
         /* Properties */
+
+        public S provider(ConfigurationProvider provider) {
+            this.provider = provider;
+            return self();
+        }
 
         public S comment(String str) {
             this.comment = str;
@@ -109,11 +117,11 @@ public class Property<T, P> implements NodeLike {
      * not equal, and just return the primitive
      * back.
      */
-    protected Property(String name, Class<T> type,
+    protected Property(String name, Class<?> type,
                        Class<?> primitiveType, String comment,
                        Accessor<T> accessor) {
         this.name = name;
-        this.type = type;
+        this.type = (Class<T>) type;
         this.primitiveType = (Class<P>) primitiveType;
         this.comment = comment;
         this.accessor = accessor;
@@ -138,6 +146,8 @@ public class Property<T, P> implements NodeLike {
     protected <T2> T2 failLoad(String s) {
         throw new PropertyLoadException(getClass().getSimpleName() + "(" + name + "): " + s);
     }
+
+
 
     /**
      * Converts the primitive value to
@@ -176,7 +186,44 @@ public class Property<T, P> implements NodeLike {
     }
 
     public void set(T value) {
-        accessor.set(schema, this, value);
+        accessor.register(schema, this, value);
+    }
+
+    /**
+     * Load the value from the given node.
+     *
+     * Utilizes {@link #valueFromPrimitive(Object)}
+     * to convert the saved value by default.
+     *
+     * @param node The node.
+     * @return The value.
+     */
+    public T loadValue(ValueNode node) {
+        return valueFromPrimitive((P) node.getValue());
+    }
+
+    /**
+     * Emit a node for the given value.
+     *
+     * Utilizes {@link #valueToPrimitive(Object)}
+     * to convert the value by default.
+     *
+     * @param value The value.
+     * @return The node.
+     */
+    public ValueNode emitValue(T value) {
+        P primitiveValue = valueToPrimitive(value);
+        return new ValueNode<>(primitiveValue);
+    }
+
+    @Override
+    public ValueNode emit() {
+        return emitValue(get());
+    }
+
+    @Override
+    public void load(ValueNode node) {
+        set(loadValue(node));
     }
 
     /* Getters */

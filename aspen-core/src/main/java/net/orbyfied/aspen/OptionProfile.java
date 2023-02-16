@@ -1,10 +1,11 @@
 package net.orbyfied.aspen;
 
-import net.orbyfied.aspen.raw.Configuration;
-import net.orbyfied.aspen.raw.ConfigurationSection;
-import org.yaml.snakeyaml.Yaml;
+import net.orbyfied.aspen.exception.ConfigurationLoadException;
+import net.orbyfied.aspen.raw.MapNode;
+import net.orbyfied.aspen.raw.Node;
 
-import java.nio.file.Files;
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.nio.file.Path;
 import java.util.logging.Logger;
 
@@ -19,15 +20,9 @@ public record OptionProfile(ConfigurationProvider provider,
                             String name,
                             String defaults,
                             Path file,
-                            OptionSchema schema,
-                            Configuration configuration) {
+                            OptionSchema schema) {
 
     static final Logger LOGGER = Logger.getLogger("OptionProfile");
-    static final Yaml YAML = new Yaml();
-
-    static {
-        YAML.setName("OptionProfile");
-    }
 
     ////////////////////////////////////
 
@@ -37,9 +32,7 @@ public record OptionProfile(ConfigurationProvider provider,
                   Path file,
                   Object instance) throws Exception {
         this(provider, name, defaults, file, new OptionSchema(null, instance)
-                .compile(provider),
-                new Configuration(file, f -> instance.getClass()
-                    .getResourceAsStream(f)));
+                .compose(provider));
     }
 
     /**
@@ -57,16 +50,14 @@ public record OptionProfile(ConfigurationProvider provider,
      * @throws IllegalStateException If an error occurs.
      */
     public OptionProfile load() {
-        try {
-            if (defaults != null) {
-                configuration.reloadOrDefaultThrowing(defaults);
-            } else {
-                if (Files.exists(file)) {
-                    configuration.reload();
-                }
-            }
+        try (FileReader reader = new FileReader(file.toFile())) {
+            // compose node
+            Node node = provider.rawProvider().compose(reader);
+            if (!(node instanceof MapNode mapNode))
+                throw new ConfigurationLoadException("Composed configuration from file " + file + " is not a map node");
 
-            loadSchema(schema, configuration);
+            // load schema
+            schema.load(mapNode);
 
             // re-save defaults to update
             save();
@@ -85,75 +76,16 @@ public record OptionProfile(ConfigurationProvider provider,
      * @throws IllegalStateException If an error occurs.
      */
     public OptionProfile save() {
-        try {
-            saveSchema(schema, configuration);
+        try (FileWriter writer = new FileWriter(file.toFile())) {
+            // emit to node tree
+            Node node = schema.emit();
 
-            // save to file
-            configuration.save();
+            // save node tree
+            provider.rawProvider().write(node, writer);
 
             return this;
         } catch (Exception e) {
             throw new IllegalStateException("Profile '" + name + "' load failed file(" + file + ")");
-        }
-    }
-
-    // load the given schema/section
-    // from the provided config section
-    protected void loadSchema(Schema schema,
-                              ConfigurationSection section) {
-        // load all properties
-        for (Property property : schema.propertyMap.values()) {
-            String key = property.name;
-            if (!section.contains(key))
-                continue;
-
-            property.schema = schema;
-
-            /* special properties */
-            if (property instanceof SectionProperty sectionProperty) {
-                loadSchema(sectionProperty.get(), section.section(key));
-                continue;
-            }
-
-            Object primVal = section.get(key);
-            Object val = property.valueFromPrimitive(primVal);
-
-            property.set(val);
-        }
-
-        // load all option sections
-        if (schema instanceof OptionSchema optionSchema) {
-            for (OptionSchema childSchema : optionSchema.providedChildren) {
-                loadSchema(childSchema, section);
-            }
-        }
-    }
-
-    // save the given schema/section
-    // to the provided config section
-    protected void saveSchema(Schema schema,
-                              ConfigurationSection section) {
-        // save all properties
-        for (Property property : schema.propertyMap.values()) {
-            property.schema = schema;
-
-            /* special properties */
-            if (property instanceof SectionProperty sectionProperty) {
-                saveSchema(sectionProperty.get(), section.section(property.name));
-                continue;
-            }
-
-            Object val = property.get();
-            Object primVal = property.valueToPrimitive(val);
-
-            section.set(property.name, primVal);
-        }
-
-        // save all option schemas
-        if (schema instanceof OptionSchema optionSchema) {
-            for (OptionSchema childSchema : optionSchema.providedChildren) {
-                saveSchema(childSchema, section);
-            }
         }
     }
 

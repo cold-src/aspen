@@ -2,7 +2,9 @@ package net.orbyfied.aspen;
 
 import net.orbyfied.aspen.annotation.Option;
 import net.orbyfied.aspen.annotation.Section;
-import net.orbyfied.aspen.properties.SimpleProperty;
+import net.orbyfied.aspen.exception.SchemaComposeException;
+import net.orbyfied.aspen.raw.MapNode;
+import net.orbyfied.aspen.raw.ValueNode;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -24,6 +26,13 @@ public abstract class Schema implements NodeLike {
         return ty;
     }
 
+    // base composer function
+    // for all schema's
+    static void composeBase(ConfigurationProvider provider,
+                            Schema schema) throws Throwable {
+        schema.composeBase(provider);
+    }
+
     ///////////////////////////////////////////
 
     protected final Object instance;
@@ -36,7 +45,7 @@ public abstract class Schema implements NodeLike {
     protected Schema parent;
 
     // the properties compiled
-    protected final Map<String, Property> propertyMap = new HashMap<>();
+    protected final LinkedHashMap<String, Property> propertyMap = new LinkedHashMap<>();
 
     /**
      * The comment on this schema.
@@ -151,12 +160,10 @@ public abstract class Schema implements NodeLike {
         return current;
     }
 
-    /**
-     * Compile this schema from the class.
-     *
-     * @return This.
-     */
-    public Schema compile(ConfigurationProvider provider) throws Exception {
+    // base composer for the schema's
+    // an instance method because i just
+    // copied over the initial code lol
+    protected void composeBase(ConfigurationProvider provider) throws Exception {
         for (Field field : klass.getDeclaredFields()) {
             if (Modifier.isStatic(field.getModifiers())) continue;
             field.setAccessible(true);
@@ -189,7 +196,7 @@ public abstract class Schema implements NodeLike {
                     Class<?> type = checkPropertyType(field.getType());
 
                     // create property
-                    OptionProcessor processor = provider.findProcessorPipeline(this, type);
+                    OptionComposer processor = provider.findOptionComposerPipeline(this, type);
                     Property.Builder builder = processor.open(
                             provider, this, name, type,
                             field
@@ -223,13 +230,59 @@ public abstract class Schema implements NodeLike {
 
                 withProperty(
                         SectionProperty.builder(name, instance.getClass())
-                        .instance(instance)
-                        .build()
+                                .provider(provider)
+                                .instance(instance)
+                                .build()
                 );
             }
         }
+    }
+
+    /**
+     * Compile this schema from the class.
+     *
+     * @return This.
+     */
+    public Schema compose(ConfigurationProvider provider) throws Exception {
+        try {
+            // make and call composer pipeline
+            provider
+                    .findSchemaComposerPipeline(this)
+                    .compose(provider, this);
+        } catch (Throwable t) {
+            if (t instanceof SchemaComposeException schemaComposeException)
+                throw schemaComposeException;
+            throw new SchemaComposeException("Uncaught Error", t);
+        }
 
         return this;
+    }
+
+    /*
+        Raw
+     */
+
+    @Override
+    public MapNode emit() {
+        MapNode node = new MapNode();
+        for (Property property : propertyMap.values()) {
+            node.putEntry(property.name, property.emit());
+        }
+
+        return node;
+    }
+
+    @Override
+    public void load(ValueNode node) {
+        if (!(node instanceof MapNode mapNode))
+            throw new IllegalStateException("Not a map node");
+        for (Map.Entry<String, ValueNode> entry : mapNode.getValue().entrySet()) {
+            Property property = getProperty(entry.getKey());
+            if (property == null)
+                continue;
+
+            property.load(entry.getValue());
+        }
     }
 
 }

@@ -20,10 +20,9 @@ ext {
     desc = "Aspen core"
 }
 
-/* apply buildsrc script */ 
+/* apply buildsrc script */
 apply from: '../buildsrc/module.gradle', to: project
 
 dependencies {
-    api project(":aspen-raw")
-    implementation 'org.jetbrains:annotations:24.0.0'
+
 }
