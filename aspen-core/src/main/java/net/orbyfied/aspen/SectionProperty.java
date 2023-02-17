@@ -49,13 +49,13 @@ public class SectionProperty extends Property<SectionSchema, Void> {
     }
 
     @Override
-    public void load(ValueNode node) {
-        get().load(node);
+    public void load(Context context, ValueNode node) {
+        get().load(context, node);
     }
 
     @Override
-    public ValueNode emit() {
-        return get().emit();
+    public ValueNode emit(Context context) {
+        return get().emit(context);
     }
 
 }

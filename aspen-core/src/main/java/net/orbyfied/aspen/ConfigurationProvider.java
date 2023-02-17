@@ -2,6 +2,9 @@ package net.orbyfied.aspen;
 
 import net.orbyfied.aspen.annotation.Defaults;
 import net.orbyfied.aspen.annotation.Docs;
+import net.orbyfied.aspen.context.ComposeContext;
+import net.orbyfied.aspen.context.ProfileLoadOperation;
+import net.orbyfied.aspen.context.ProfileEmitOperation;
 import net.orbyfied.aspen.properties.SimpleProperty;
 import net.orbyfied.aspen.raw.RawProvider;
 import net.orbyfied.aspen.util.Pair;
@@ -16,8 +19,6 @@ import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Predicate;
-
-import static net.orbyfied.aspen.OptionComposer.processIfPresent;
 
 /**
  * Main manager/service provider for the
@@ -79,20 +80,22 @@ public class ConfigurationProvider {
     };
 
     static final SchemaComposer BASE_SCHEMA_COMPOSER = new SchemaComposer() {
+
         @Override
         public int exactness() {
             return Integer.MAX_VALUE;
         }
 
         @Override
-        public boolean matches(ConfigurationProvider provider, Schema schema) {
+        public boolean matches(ComposeContext context) {
             return true;
         }
 
         @Override
-        public void compose(ConfigurationProvider provider, Schema schema) throws Throwable {
-            Schema.composeBase(provider, schema);
+        public void compose(ComposeContext context) throws Throwable {
+            Schema.composeBase(context);
         }
+
     };
 
     /*
@@ -245,17 +248,17 @@ public class ConfigurationProvider {
 
     /**
      * Finds the correct schema composers for
-     * the given schema and returns it as an
+     * the given context and returns it as an
      * ordered pipeline.
      *
-     * @param schema The schema.
+     * @param context The context.
      * @return The pipeline.
      */
-    public SchemaComposer findSchemaComposerPipeline(Schema schema) {
+    public SchemaComposer findSchemaComposerPipeline(ComposeContext context) {
         List<SchemaComposer> composers = new ArrayList<>();
         for (SchemaComposer composer : this.schemaComposers) {
             if (composer.matches(
-                    this, schema
+                    context
             )) {
                 composers.add(composer);
             }
@@ -308,9 +311,9 @@ public class ConfigurationProvider {
      *
      * @return The profile.
      */
-    public OptionProfile parseProfile(String name,
-                                      Object instance,
-                                      Path path) {
+    public OptionProfile composeProfile(String name,
+                                        Object instance,
+                                        Path path) {
         try {
             Class<?> klass = instance.getClass();
 
@@ -323,7 +326,7 @@ public class ConfigurationProvider {
                     newProfile(name, instance, defaults, path);
 
             if (klass.isAnnotationPresent(Docs.class)) {
-                profile.schema().setComment(klass.getAnnotation(Docs.class).value());
+                profile.schema().setComment(klass.getAnnotation(Docs.class).inLine());
             }
 
             return profile;
@@ -346,6 +349,36 @@ public class ConfigurationProvider {
     public ConfigurationProvider withPropertyBehaviour(PropertyBehaviour propertyType) {
         propertyBehaviourMap.put(propertyType.complexClass(), propertyType);
         return this;
+    }
+
+    /**
+     * Create a new context to execute
+     * a compose operation.
+     *
+     * @return The context.
+     */
+    public ComposeContext newSchemaComposeContext(Schema schema) {
+        return new ComposeContext(this, null, schema);
+    }
+
+    /**
+     * Create a new context to execute
+     * a load operation.
+     *
+     * @return The context.
+     */
+    public Context newLoadContext(OptionProfile profile) {
+        return new Context(this, new ProfileLoadOperation(profile), profile.schema());
+    }
+
+    /**
+     * Create a new context to execute
+     * a save operation.
+     *
+     * @return The context.
+     */
+    public Context newEmitContext(OptionProfile profile) {
+        return new Context(this, new ProfileEmitOperation(profile), profile.schema());
     }
 
 }

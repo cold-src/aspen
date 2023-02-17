@@ -156,6 +156,7 @@ public class YamlRawProvider implements RawProvider {
         this.mapKeyStyle = mapKeyStyle;
         this.mapFlowStyle = mapFlowStyle;
         this.listFlowStyle = listFlowStyle;
+        this.spacedComments = spacedComments;
     }
 
     @Override
@@ -170,7 +171,6 @@ public class YamlRawProvider implements RawProvider {
         org.yaml.snakeyaml.nodes.Node yamlNode = yaml.compose(reader);
 
         Node node = fromYamlNode(yamlNode);
-        System.out.println(node);
         return node;
     }
 

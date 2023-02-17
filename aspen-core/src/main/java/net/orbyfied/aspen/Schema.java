@@ -2,6 +2,7 @@ package net.orbyfied.aspen;
 
 import net.orbyfied.aspen.annotation.Option;
 import net.orbyfied.aspen.annotation.Section;
+import net.orbyfied.aspen.context.ComposeContext;
 import net.orbyfied.aspen.exception.SchemaComposeException;
 import net.orbyfied.aspen.raw.MapNode;
 import net.orbyfied.aspen.raw.ValueNode;
@@ -28,9 +29,8 @@ public abstract class Schema implements NodeLike {
 
     // base composer function
     // for all schema's
-    static void composeBase(ConfigurationProvider provider,
-                            Schema schema) throws Throwable {
-        schema.composeBase(provider);
+    static void composeBase(ComposeContext context) throws Throwable {
+        context.schema().composeBase(context.provider(), context);
     }
 
     ///////////////////////////////////////////
@@ -162,7 +162,8 @@ public abstract class Schema implements NodeLike {
     // base composer for the schema's
     // an instance method because i just
     // copied over the initial code lol
-    protected void composeBase(ConfigurationProvider provider) throws Exception {
+    protected void composeBase(ConfigurationProvider provider,
+                               ComposeContext context) throws Exception {
         for (Field field : klass.getDeclaredFields()) {
             if (Modifier.isStatic(field.getModifiers())) continue;
             field.setAccessible(true);
@@ -180,6 +181,23 @@ public abstract class Schema implements NodeLike {
                 withProperty(property);
             }
 
+            // check for property access
+            Object pa;
+            if (PropertyAccess.class.isAssignableFrom(field.getType()) &&
+                    (pa = field.get(instance)) != null && pa instanceof PropertyAccess.Future propertyAccess) {
+                Property p = propertyAccess.property;
+                if (propertyMap.get(p.name) != p) {
+                    withProperty(p);
+                }
+
+                // create access
+                propertyAccess.access = PropertyAccess.constant(
+                        p,
+                        provider,
+                        this
+                );
+            }
+
             // check for option
             if (provider.processAnnotations()) {
                 if (property == null &&
@@ -193,6 +211,23 @@ public abstract class Schema implements NodeLike {
                     }
 
                     Class<?> type = checkPropertyType(field.getType());
+
+                    // check for property accessor
+                    if (PropertyAccess.class.isAssignableFrom(type)) {
+                        context.schedulePost(__ -> {
+                            // get property
+                            Property p = getProperty(optionDesc.name());
+
+                            PropertyAccess access = PropertyAccess.constant(
+                                    p,
+                                    context.provider(), Schema.this
+                            );
+
+                            field.set(instance, access);
+                        });
+
+                        continue;
+                    }
 
                     // create property
                     OptionComposer processor = provider.findOptionComposerPipeline(this, type);
@@ -243,9 +278,11 @@ public abstract class Schema implements NodeLike {
     public Schema compose(ConfigurationProvider provider) throws Exception {
         try {
             // make and call composer pipeline
+            ComposeContext context = provider.newSchemaComposeContext(this);
             provider
-                    .findSchemaComposerPipeline(this)
-                    .compose(provider, this);
+                    .findSchemaComposerPipeline(context)
+                    .compose(context);
+            context.runPost();
         } catch (Throwable t) {
             if (t instanceof SchemaComposeException schemaComposeException)
                 throw schemaComposeException;
@@ -260,17 +297,21 @@ public abstract class Schema implements NodeLike {
      */
 
     @Override
-    public MapNode emit() {
+    public MapNode emit(Context context) {
+        context.schema = this;
+        Context forked = context.fork();
         MapNode node = new MapNode();
         for (Property property : propertyMap.values()) {
-            node.putEntry(property.name, property.emit());
+            node.putEntry(property.name, property.emit(forked));
         }
 
         return node;
     }
 
     @Override
-    public void load(ValueNode node) {
+    public void load(Context context, ValueNode node) {
+        context.schema = this;
+        Context forked = context.fork();
         if (!(node instanceof MapNode mapNode))
             throw new IllegalStateException("Not a map node");
         for (Map.Entry<String, ValueNode> entry : mapNode.getValue().entrySet()) {
@@ -278,7 +319,7 @@ public abstract class Schema implements NodeLike {
             if (property == null)
                 continue;
 
-            property.load(entry.getValue());
+            property.load(forked, entry.getValue());
         }
     }
 

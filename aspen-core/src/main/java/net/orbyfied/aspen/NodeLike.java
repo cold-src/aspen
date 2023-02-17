@@ -26,7 +26,7 @@ public interface NodeLike {
      *
      * @return The node.
      */
-    ValueNode<?> emit();
+    ValueNode<?> emit(Context context);
 
     /**
      * Load the value of the node into
@@ -34,6 +34,6 @@ public interface NodeLike {
      *
      * @param node The node.
      */
-    void load(ValueNode<?> node);
+    void load(Context context, ValueNode<?> node);
 
 }

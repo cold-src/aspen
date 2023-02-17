@@ -80,7 +80,8 @@ public record OptionProfile(ConfigurationProvider provider,
                 throw new ConfigurationLoadException("Composed configuration from file " + file + " is not a map node");
 
             // load schema
-            schema.load(mapNode);
+            Context context = provider.newLoadContext(this);
+            schema.load(context, mapNode);
 
             return this;
         } catch (Exception e) {
@@ -98,7 +99,8 @@ public record OptionProfile(ConfigurationProvider provider,
     public OptionProfile save() {
         try (FileWriter writer = new FileWriter(createIfAbsent(file).toFile())) {
             // emit to node tree
-            Node node = schema.emit();
+            Context context = provider.newEmitContext(this);
+            Node node = schema.emit(context);
 
             // save node tree
             provider.rawProvider().write(node, writer);

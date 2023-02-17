@@ -81,22 +81,22 @@ public class OptionSchema extends Schema {
     }
 
     @Override
-    public MapNode emit() {
+    public MapNode emit(Context context) {
         MapNode node = new MapNode();
         for (OptionSchema schema : providedChildren) {
-            node.addAll(schema.emit());
+            node.addAll(schema.emit(context));
         }
 
-        return super.emit().merge(node);
+        return super.emit(context).merge(node);
     }
 
     @Override
-    public void load(ValueNode node) {
+    public void load(Context context, ValueNode node) {
         for (OptionSchema schema : providedChildren) {
-            schema.load(node);
+            schema.load(context, node);
         }
 
-        super.load(node);
+        super.load(context, node);
     }
 
 }

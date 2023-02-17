@@ -1,5 +1,6 @@
 package net.orbyfied.aspen;
 
+import net.orbyfied.aspen.context.PropertyContext;
 import net.orbyfied.aspen.exception.PropertyLoadException;
 import net.orbyfied.aspen.raw.Node;
 import net.orbyfied.aspen.raw.ValueNode;
@@ -63,6 +64,8 @@ public class Property<T, P> implements NodeLike {
 
         protected Supplier<T> defaultValueSupplier;
 
+        protected boolean shared = false;
+
         // the instance factory
         private final Supplier<R> factory;
 
@@ -110,6 +113,11 @@ public class Property<T, P> implements NodeLike {
             return this;
         }
 
+        public Builder<T, P, R> shared() {
+            this.shared = true;
+            return this;
+        }
+
         public Builder<T, P, R> defaultValue(Supplier<T> supplier) {
             this.defaultValueSupplier = supplier;
             return this;
@@ -124,13 +132,16 @@ public class Property<T, P> implements NodeLike {
             R property = factory.get();
 
             // set properties
+            property.provider = provider;
             property.name = name;
             property.primitiveType = primitiveType;
             property.complexType = complexType;
             if (property.accessor == null) property.accessor = accessor;
             if (property.commenter == null) property.commenter = commenter;
 
-            // create defaulted accessor
+            // create actual accessor
+            if (shared)
+                property.accessor = Accessor.sharedMutable();
             property.actualAccessor = Accessor.defaulted(Accessor.dynamic(() -> property.accessor), defaultValueSupplier);
 
             // add components
@@ -149,12 +160,17 @@ public class Property<T, P> implements NodeLike {
                 }
             }
 
+            property.init();
+
             return property;
         }
 
     }
 
     //////////////////////////////////////////
+
+    // the configuration provider
+    protected ConfigurationProvider provider;
 
     // the name of this property
     protected String name;
@@ -178,10 +194,40 @@ public class Property<T, P> implements NodeLike {
     // the components on this property
     protected Map<Class<?>, PropertyComponent> componentMap;
 
+    /*
+        Cached Values
+     */
+
+    PropertyContext localContext;
+
     /**
      * Constructor for builders.
      */
     protected Property() { }
+
+    // initializes this property
+    // after the builder is done
+    // configuring
+    protected void init() {
+        localContext = new PropertyContext(
+                provider,
+                null,
+                schema
+        );
+    }
+
+    // get the property context from
+    // the given context, or use the
+    // local context
+    protected PropertyContext getPropertyContextOrLocal(Context context) {
+        if (context == null)
+            return localContext;
+        if (context instanceof PropertyContext pc) {
+            return pc.property(this);
+        }
+
+        return PropertyContext.from(context, this);
+    }
 
     public Schema getSchema() {
         return schema;
@@ -230,12 +276,47 @@ public class Property<T, P> implements NodeLike {
         return (P) value;
     }
 
+    /**
+     * Get in the given context.
+     *
+     * @param context The context.
+     * @return The value.
+     */
+    public T get(PropertyContext context) {
+        return actualAccessor.get(context.property(this));
+    }
+
     public T get() {
-        return actualAccessor.get(schema, this);
+        return get(localContext);
+    }
+
+    /**
+     * Set the value in the given context.
+     *
+     * @param context The context.
+     * @param value The value.
+     */
+    public void set(PropertyContext context, T value) {
+        actualAccessor.register(context.property(this), value);
     }
 
     public void set(T value) {
-        actualAccessor.register(schema, this, value);
+        set(localContext, value);
+    }
+
+    /**
+     * Get if the property has a value set
+     * in the given context.
+     *
+     * @param context The context.
+     * @return True/false.
+     */
+    public boolean has(PropertyContext context) {
+        return actualAccessor.has(context);
+    }
+
+    public boolean has() {
+        return has(localContext);
     }
 
     // load value impl
@@ -283,16 +364,24 @@ public class Property<T, P> implements NodeLike {
     }
 
     @Override
-    public ValueNode emit() {
-        Node node = emitValue0(get());
+    public ValueNode emit(Context context) {
+        Node node = emitValue0(get(getPropertyContextOrLocal(context)));
         if (commenter != null)
             commenter.accept(node);
         return (ValueNode) node;
     }
 
     @Override
+    public void load(Context context, ValueNode node) {
+        set(getPropertyContextOrLocal(context), loadValue0(node));
+    }
+
+    public ValueNode emit() {
+        return emit(null);
+    }
+
     public void load(ValueNode node) {
-        set(loadValue0(node));
+        load(null, node);
     }
 
     /* Getters */

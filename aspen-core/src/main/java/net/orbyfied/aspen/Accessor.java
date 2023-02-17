@@ -1,9 +1,12 @@
 package net.orbyfied.aspen;
 
+import net.orbyfied.aspen.context.PropertyContext;
 import net.orbyfied.aspen.util.UnsafeUtil;
 import sun.misc.Unsafe;
 
 import java.lang.reflect.Field;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.function.Supplier;
 
 /**
@@ -20,17 +23,17 @@ public interface Accessor<T> {
     static <T> Accessor<T> special(T value) {
         return new Accessor<>() {
             @Override
-            public T get(Schema schema, Property<T, ?> property) {
+            public T get(PropertyContext context) {
                 return value;
             }
 
             @Override
-            public void register(Schema schema, Property<T, ?> property, T value) {
+            public void register(PropertyContext context, T value) {
 
             }
 
             @Override
-            public boolean has(Schema schema, Property<T, ?> property) {
+            public boolean has(PropertyContext context) {
                 return true;
             }
         };
@@ -44,18 +47,18 @@ public interface Accessor<T> {
             boolean set = false;
 
             @Override
-            public T get(Schema schema, Property<T, ?> property) {
+            public T get(PropertyContext context) {
                 return val;
             }
 
             @Override
-            public void register(Schema schema, Property<T, ?> property, T value) {
+            public void register(PropertyContext context, T value) {
                 val = value;
                 set = true;
             }
 
             @Override
-            public boolean has(Schema schema, Property<T, ?> property) {
+            public boolean has(PropertyContext context) {
                 return set;
             }
         };
@@ -71,18 +74,18 @@ public interface Accessor<T> {
             boolean set = false;
 
             @Override
-            public T get(Schema schema, Property<T, ?> property) {
+            public T get(PropertyContext context) {
                 return (T) unsafe.getObjectVolatile(source.instance, offset);
             }
 
             @Override
-            public void register(Schema schema, Property<T, ?> property, T value) {
+            public void register(PropertyContext context, T value) {
                 unsafe.putObjectVolatile(source.instance, offset, value);
                 set = true;
             }
 
             @Override
-            public boolean has(Schema schema, Property<T, ?> property) {
+            public boolean has(PropertyContext context) {
                 return set;
             }
         };
@@ -94,24 +97,24 @@ public interface Accessor<T> {
             return accessor;
         return new Accessor<>() {
             @Override
-            public T get(Schema schema, Property<T, ?> property) {
-                if (!accessor.has(schema, property)) {
+            public T get(PropertyContext context) {
+                if (!accessor.has(context)) {
                     T t = defSupplier.get();
-                    register(schema, property, t);
+                    register(context, t);
                     return t;
                 }
 
-                return accessor.get(schema, property);
+                return accessor.get(context);
             }
 
             @Override
-            public void register(Schema schema, Property<T, ?> property, T value) {
-                accessor.register(schema, property, value);
+            public void register(PropertyContext context, T value) {
+                accessor.register(context, value);
             }
 
             @Override
-            public boolean has(Schema schema, Property<T, ?> property) {
-                return accessor.has(schema, property);
+            public boolean has(PropertyContext context) {
+                return accessor.has(context);
             }
         };
     }
@@ -119,18 +122,46 @@ public interface Accessor<T> {
     static <T> Accessor<T> dynamic(Supplier<Accessor<T>> supplier) {
         return new Accessor<>() {
             @Override
-            public T get(Schema schema, Property<T, ?> property) {
-                return supplier.get().get(schema, property);
+            public T get(PropertyContext context) {
+                return supplier.get().get(context);
             }
 
             @Override
-            public void register(Schema schema, Property<T, ?> property, T value) {
-                supplier.get().register(schema, property, value);
+            public void register(PropertyContext context, T value) {
+                supplier.get().register(context, value);
             }
 
             @Override
-            public boolean has(Schema schema, Property<T, ?> property) {
-                return supplier.get().has(schema, property);
+            public boolean has(PropertyContext context) {
+                return supplier.get().has(context);
+            }
+        };
+    }
+
+    /**
+     * Creates a new shared accessor which stored
+     * each value by schema separately.
+     *
+     * @return The accessor.
+     */
+    static <T> Accessor<T> sharedMutable() {
+        return new Accessor<>() {
+            // the value cache
+            Map<Schema, T> valueMap = new HashMap<>();
+
+            @Override
+            public T get(PropertyContext context) {
+                return valueMap.get(context.schema());
+            }
+
+            @Override
+            public void register(PropertyContext context, T value) {
+                valueMap.put(context.schema(), value);
+            }
+
+            @Override
+            public boolean has(PropertyContext context) {
+                return valueMap.containsKey(context.schema());
             }
         };
     }
@@ -141,11 +172,10 @@ public interface Accessor<T> {
      * Get the value of the property if
      * present in the given context.
      *
-     * @param schema The schema.
-     * @param property The property.
+     * @param context The context.
      * @return The value if present.
      */
-    T get(Schema schema, Property<T, ?> property);
+    T get(PropertyContext context);
 
     /**
      * Register a value.
@@ -154,20 +184,18 @@ public interface Accessor<T> {
      * appending for embedded properties,
      * or anything else.
      *
-     * @param schema The schema.
-     * @param property The property.
+     * @param context The context.
      * @param value The value to register.
      */
-    void register(Schema schema, Property<T, ?> property, T value);
+    void register(PropertyContext context, T value);
 
     /**
      * If this accessor can access a value
      * in the given context.
      *
-     * @param schema The schema.
-     * @param property The property.
+     * @param context The context.
      * @return True/false.
      */
-    boolean has(Schema schema, Property<T, ?> property);
+    boolean has(PropertyContext context);
 
 }

@@ -12,6 +12,6 @@ import java.lang.annotation.RetentionPolicy;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Docs {
 
-    String value();
+    String inLine();
 
 }
