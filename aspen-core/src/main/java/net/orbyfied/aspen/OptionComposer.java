@@ -8,6 +8,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 /**
  * A class which describes processing of
@@ -72,6 +73,32 @@ public interface OptionComposer {
             @Override
             public void configure(OptionComposeContext context) throws Exception {
                 consumer.accept(context, context.element().getAnnotation(annotation));
+            }
+        };
+    }
+
+    static <A extends Annotation> OptionComposer composeAllOfType(Class<?> type,
+                                                                  Predicate<OptionComposeContext> opener,
+                                                                  Consumer<OptionComposeContext> configure) {
+        return new OptionComposer() {
+            @Override
+            public int exactness() {
+                return 5;
+            }
+
+            @Override
+            public boolean matches(OptionComposeContext context) {
+                return type.isAssignableFrom(context.type());
+            }
+
+            @Override
+            public boolean open(OptionComposeContext context) throws Exception {
+                return opener.test(context);
+            }
+
+            @Override
+            public void configure(OptionComposeContext context) throws Exception {
+                configure.accept(context);
             }
         };
     }

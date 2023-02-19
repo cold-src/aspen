@@ -1,5 +1,11 @@
 package net.orbyfied.aspen.util;
 
+/**
+ * A tuple of two values.
+ *
+ * @param <A> The first type.
+ * @param <B> The second type.
+ */
 public class Pair<A, B> {
 
     public A first;

@@ -4,7 +4,10 @@ import net.orbyfied.aspen.ConfigurationProvider;
 import net.orbyfied.aspen.Property;
 import net.orbyfied.aspen.Schema;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 @SuppressWarnings({ "rawtypes", "unchecked" })
 public class OptionComposeContext extends ComposeContext {
@@ -29,8 +32,8 @@ public class OptionComposeContext extends ComposeContext {
         return name;
     }
 
-    public Class<?> type() {
-        return type;
+    public <T> Class<T> type() {
+        return (Class<T>) type;
     }
 
     public AnnotatedElement element() {
@@ -56,6 +59,13 @@ public class OptionComposeContext extends ComposeContext {
         if (!bClass.isInstance(builder))
             throw new IllegalStateException("No builder of type " + bClass.getName() + " available");
         return (B) builder;
+    }
+
+    public <A extends Annotation> void processIfPresent(Class<A> aClass,
+                                                        Consumer<A> consumer) {
+        A annotation = element.getAnnotation(aClass);
+        if (annotation != null)
+            consumer.accept(annotation);
     }
 
 }

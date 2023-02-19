@@ -147,8 +147,23 @@ public class Property<T, P> implements BaseRepresentable {
             // add components
             if (!components.isEmpty()) {
                 property.componentMap = new HashMap<>();
-                for (PropertyComponent component : components)
-                    property.componentMap.put(component.getClass(), component);
+                for (PropertyComponent component : components) {
+                    Class<?> kl = component.getClass();
+                    PropertyComponent in = property.componentMap.get(kl);
+                    if (in != null) {
+                        PropertyComponent.Pipeline pipeline;
+                        if (in instanceof PropertyComponent.Pipeline)
+                            pipeline = (PropertyComponent.Pipeline) in;
+                        else {
+                            pipeline = PropertyComponent.pipeline();
+                            pipeline.with(in).with(component);
+                        }
+
+                        property.componentMap.put(kl, pipeline);
+                    } else {
+                        property.componentMap.put(kl, component);
+                    }
+                }
             }
 
             // check conversions between primitive
@@ -235,6 +250,10 @@ public class Property<T, P> implements BaseRepresentable {
 
     public <C extends PropertyComponent> C component(Class<C> cClass) {
         return (C) componentMap.get(cClass);
+    }
+
+    public PropertyComponent.Pipeline componentPipeline(Class<?> cClass) {
+        return (PropertyComponent.Pipeline) componentMap.get(cClass);
     }
 
     /**

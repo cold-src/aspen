@@ -2,10 +2,13 @@ package net.orbyfied.aspen;
 
 import net.orbyfied.aspen.annotation.Defaults;
 import net.orbyfied.aspen.annotation.Docs;
+import net.orbyfied.aspen.annotation.MinMax;
+import net.orbyfied.aspen.components.ValueConstraints;
 import net.orbyfied.aspen.context.ComposeContext;
 import net.orbyfied.aspen.context.OptionComposeContext;
 import net.orbyfied.aspen.context.ProfileLoadOperation;
 import net.orbyfied.aspen.context.ProfileEmitOperation;
+import net.orbyfied.aspen.properties.NumberProperty;
 import net.orbyfied.aspen.properties.SimpleProperty;
 import net.orbyfied.aspen.raw.RawProvider;
 import net.orbyfied.aspen.raw.nodes.RawNode;
@@ -189,7 +192,14 @@ public class ConfigurationProvider {
 
     {
         /* default option processors */
-
+        withOptionComposer(OptionComposer.composeAllOfType(Number.class, context -> {
+            context.builder(NumberProperty.builder(context.name(), context.type()));
+            return true;
+        }, context -> {
+            context.processIfPresent(MinMax.class, minMax -> {
+                context.builder().with(ValueConstraints.minMax(minMax.min(), minMax.max()));
+            });
+        }));
     }
 
     /* Settings */
