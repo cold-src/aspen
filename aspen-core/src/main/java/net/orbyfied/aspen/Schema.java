@@ -3,9 +3,13 @@ package net.orbyfied.aspen;
 import net.orbyfied.aspen.annotation.Option;
 import net.orbyfied.aspen.annotation.Section;
 import net.orbyfied.aspen.context.ComposeContext;
+import net.orbyfied.aspen.context.OptionComposeContext;
+import net.orbyfied.aspen.exception.AspenException;
 import net.orbyfied.aspen.exception.SchemaComposeException;
-import net.orbyfied.aspen.raw.MapNode;
-import net.orbyfied.aspen.raw.ValueNode;
+import net.orbyfied.aspen.raw.nodes.RawMapNode;
+import net.orbyfied.aspen.raw.nodes.RawNode;
+import net.orbyfied.aspen.raw.nodes.RawPairNode;
+import net.orbyfied.aspen.raw.nodes.RawScalarNode;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -19,7 +23,7 @@ import java.util.*;
  * @author orbyfied
  */
 @SuppressWarnings({ "unchecked", "rawtypes" })
-public abstract class Schema implements NodeLike {
+public abstract class Schema implements BaseRepresentable {
 
     public static Class<?> checkPropertyType(Class<?> ty) {
         if (ty.isPrimitive())
@@ -34,6 +38,8 @@ public abstract class Schema implements NodeLike {
     }
 
     ///////////////////////////////////////////
+
+    protected final ConfigurationProvider provider;
 
     protected final Object instance;
     protected final Class<?> klass;
@@ -61,11 +67,15 @@ public abstract class Schema implements NodeLike {
      */
     protected String comment;
 
-    public Schema(Schema parent, String name, Object instance) {
+    public Schema(ConfigurationProvider provider, Schema parent, String name, Object instance) {
+        this.provider = provider;
         this.parent   = parent;
         this.name     = name;
         this.instance = instance;
-        this.klass    = instance.getClass();
+        if (instance != null)
+            this.klass = instance.getClass();
+        else
+            this.klass = null;
     }
 
     public Class<?> getSchemaClass() {
@@ -124,10 +134,34 @@ public abstract class Schema implements NodeLike {
         return curr;
     }
 
-    public Schema getSectionFlat(String name) {
+    public Schema getSection(String name) {
         Property property = propertyMap.get(name);
         if (property == null || property.getClass() != SectionProperty.class)
             return null;
+        return ((SectionProperty) property).get();
+    }
+
+    /**
+     * Get a section by name or create a virtual one.
+     *
+     * A virtual section is a section with a virtual schema.
+     * This means it is not backed by an instance or class
+     * and is purely temporary and code created.
+     *
+     * @param name The name.
+     * @return The section or null if a property with a different type was present.
+     */
+    public SectionSchema virtualSection(String name) {
+        Property property = propertyMap.get(name);
+        if (property != null && property.getClass() != SectionProperty.class)
+            return null;
+        if (property == null) {
+            property = SectionProperty
+                    .virtual(provider, this, name)
+                    .build();
+            withProperty(property);
+        }
+
         return ((SectionProperty) property).get();
     }
 
@@ -138,7 +172,7 @@ public abstract class Schema implements NodeLike {
      * @param path The path to traverse.
      * @return The section or null if absent.
      */
-    public Schema getSection(String path) {
+    public SectionSchema findSection(String path) {
         if (path.isEmpty())
             return null;
         Schema current = this;
@@ -148,15 +182,55 @@ public abstract class Schema implements NodeLike {
             i++;
         }
 
+        StringBuilder segment = new StringBuilder();
         for (; i < path.length(); i++) {
-            StringBuilder segment = new StringBuilder();
+            segment.delete(0, segment.length());
             for (; i < path.length() && path.charAt(i) != '/'; i++) {
                 segment.append(path.charAt(i));
             }
-            current = current.getSectionFlat(segment.toString());
+
+            current = current.getSection(segment.toString());
+
+            if (current == null)
+                return null;
         }
 
-        return current;
+        return (SectionSchema) current;
+    }
+
+    /**
+     * Get a property recursively
+     * through a path.
+     *
+     * @param path The path to traverse.
+     * @return The section or null if absent.
+     */
+    public Property findProperty(String path) {
+        if (path.isEmpty())
+            return null;
+        Schema current = this;
+        int i = 0;
+        if (path.charAt(0) == '/') {
+            current = getRoot();
+            i++;
+        }
+
+        StringBuilder segment = new StringBuilder();
+        for (; i < path.length(); i++) {
+            segment.delete(0, segment.length());
+            for (; i < path.length() && path.charAt(i) != '/'; i++) {
+                segment.append(path.charAt(i));
+            }
+
+            Property property = current.getProperty(segment.toString());
+            if (property instanceof SectionProperty sectionProperty) {
+                current = sectionProperty.get();
+            } else {
+                return property;
+            }
+        }
+
+        return null;
     }
 
     // base composer for the schema's
@@ -185,16 +259,22 @@ public abstract class Schema implements NodeLike {
             Object pa;
             if (PropertyAccess.class.isAssignableFrom(field.getType()) &&
                     (pa = field.get(instance)) != null && pa instanceof PropertyAccess.Future propertyAccess) {
-                Property p = propertyAccess.property;
-                if (propertyMap.get(p.name) != p) {
-                    withProperty(p);
+                // get property to access
+                Property p = null;
+                if (propertyAccess instanceof PropertyAccess.PropertyFuture future) {
+                    p = future.property;
+                    if (propertyMap.get(p.name) != p) {
+                        withProperty(p);
+                    }
+                } else if (propertyAccess instanceof PropertyAccess.FindFuture future) {
+                    p = findProperty(future.path);
                 }
 
                 // create access
                 propertyAccess.access = PropertyAccess.constant(
                         p,
                         provider,
-                        this
+                        p.schema
                 );
             }
 
@@ -230,15 +310,17 @@ public abstract class Schema implements NodeLike {
                     }
 
                     // create property
-                    OptionComposer processor = provider.findOptionComposerPipeline(this, type);
-                    Property.Builder builder = processor.open(
-                            provider, this, name, type,
-                            field
-                    );
-                    builder.accessor(Accessor.forField(this, field));
-                    processor.configure(provider, this, field, builder);
-                    property = builder.build();
+                    OptionComposeContext composeContext = provider.newOptionComposeContext(this, name, field, type);
+                    OptionComposer composerPipeline = provider.findOptionComposerPipeline(composeContext);
+                    if (/* open context */ !composerPipeline.open(composeContext)) {
+                        throw new SchemaComposeException("Failed to open compose of option " + name + " on field " + field);
+                    }
 
+                    composeContext.builder() // standard accessor
+                            .accessor(Accessor.forField(this, field));
+                    composerPipeline.configure(composeContext); // configure context
+
+                    property = composeContext.builder().build();
                     withProperty(property);
                 }
 
@@ -263,7 +345,7 @@ public abstract class Schema implements NodeLike {
                 }
 
                 withProperty(
-                        SectionProperty.builder(provider, name, klass, instance)
+                        SectionProperty.builder(provider, this, name, klass, instance)
                         .build()
                 );
             }
@@ -284,8 +366,8 @@ public abstract class Schema implements NodeLike {
                     .compose(context);
             context.runPost();
         } catch (Throwable t) {
-            if (t instanceof SchemaComposeException schemaComposeException)
-                throw schemaComposeException;
+            if (t instanceof AspenException e)
+                throw e;
             throw new SchemaComposeException("Uncaught Error", t);
         }
 
@@ -297,10 +379,10 @@ public abstract class Schema implements NodeLike {
      */
 
     @Override
-    public MapNode emit(Context context) {
+    public RawMapNode emit(Context context) {
         context.schema = this;
         Context forked = context.fork();
-        MapNode node = new MapNode();
+        RawMapNode node = new RawMapNode();
         for (Property property : propertyMap.values()) {
             node.putEntry(property.name, property.emit(forked));
         }
@@ -309,17 +391,19 @@ public abstract class Schema implements NodeLike {
     }
 
     @Override
-    public void load(Context context, ValueNode node) {
+    public void load(Context context, RawNode node) {
         context.schema = this;
         Context forked = context.fork();
-        if (!(node instanceof MapNode mapNode))
+        if (!(node instanceof RawMapNode mapNode))
             throw new IllegalStateException("Not a map node");
-        for (Map.Entry<String, ValueNode> entry : mapNode.getValue().entrySet()) {
-            Property property = getProperty(entry.getKey());
-            if (property == null)
-                continue;
+        for (RawNode node1 : mapNode.getNodes()) {
+            if (node1 instanceof RawPairNode entry) {
+                Property property = getProperty(((RawScalarNode<String>)entry.getKey()).getValue());
+                if (property == null)
+                    continue;
 
-            property.load(forked, entry.getValue());
+                property.load(forked, entry.getValue());
+            }
         }
     }
 

@@ -1,4 +1,6 @@
-package net.orbyfied.aspen.raw;
+package net.orbyfied.aspen.raw.nodes;
+
+import net.orbyfied.aspen.raw.source.NodeSource;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -7,7 +9,19 @@ import java.util.List;
 /**
  * A node in configuration.
  */
-public class Node {
+public class RawNode {
+
+    // the source of this node
+    NodeSource source;
+
+    public RawNode source(NodeSource source) {
+        this.source = source;
+        return this;
+    }
+
+    public NodeSource source() {
+        return source;
+    }
 
     /*
         Comments
@@ -22,12 +36,12 @@ public class Node {
         return blockComment;
     }
 
-    public Node blockCommentLines(List<String> blockComment) {
+    public RawNode blockCommentLines(List<String> blockComment) {
         this.blockComment = blockComment;
         return this;
     }
 
-    public Node blockComment(String blockComment) {
+    public RawNode blockComment(String blockComment) {
         return blockCommentLines(Arrays.asList(blockComment.split("\n")));
     }
 
@@ -35,12 +49,12 @@ public class Node {
         return inLineComment;
     }
 
-    public Node inLineCommentLines(List<String> list) {
+    public RawNode inLineCommentLines(List<String> list) {
         this.inLineComment = list;
         return this;
     }
 
-    public Node inLineComment(String str) {
+    public RawNode inLineComment(String str) {
         return inLineCommentLines(Arrays.asList(str.split("\n")));
     }
 
@@ -48,12 +62,12 @@ public class Node {
         return endComment;
     }
 
-    public Node endCommentLines(List<String> list) {
+    public RawNode endCommentLines(List<String> list) {
         this.endComment = list;
         return this;
     }
 
-    public Node endComment(String str) {
+    public RawNode endComment(String str) {
         return endCommentLines(Arrays.asList(str.split("\n")));
     }
 

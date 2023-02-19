@@ -1,8 +1,9 @@
 package net.orbyfied.aspen;
 
+import net.orbyfied.aspen.exception.AspenException;
 import net.orbyfied.aspen.exception.ConfigurationLoadException;
-import net.orbyfied.aspen.raw.MapNode;
-import net.orbyfied.aspen.raw.Node;
+import net.orbyfied.aspen.raw.nodes.RawMapNode;
+import net.orbyfied.aspen.raw.nodes.RawNode;
 import net.orbyfied.aspen.util.Throwables;
 
 import java.io.FileReader;
@@ -51,8 +52,12 @@ public record OptionProfile(ConfigurationProvider provider,
                   String defaults,
                   Path file,
                   Object instance) throws Exception {
-        this(provider, name, defaults, file, new OptionSchema(null, instance)
-                .compose(provider));
+        this(provider, name, defaults, file, new OptionSchema(provider, instance));
+    }
+
+    public OptionProfile compose() throws Exception {
+        schema.compose(provider);
+        return this;
     }
 
     /**
@@ -75,8 +80,8 @@ public record OptionProfile(ConfigurationProvider provider,
 
         try (FileReader reader = new FileReader(file.toFile())) {
             // compose node
-            Node node = provider.rawProvider().compose(reader);
-            if (!(node instanceof MapNode mapNode))
+            RawNode node = provider.rawProvider().compose(reader);
+            if (!(node instanceof RawMapNode mapNode))
                 throw new ConfigurationLoadException("Composed configuration from file " + file + " is not a map node");
 
             // load schema
@@ -85,7 +90,9 @@ public record OptionProfile(ConfigurationProvider provider,
 
             return this;
         } catch (Exception e) {
-            throw new IllegalStateException("Profile '" + name + "' load failed file(" + file + ")", e);
+            if (e instanceof AspenException aspenException)
+                throw aspenException;
+            throw new ConfigurationLoadException("Profile '" + name + "' load failed file(" + file + ")", e);
         }
     }
 
@@ -100,13 +107,15 @@ public record OptionProfile(ConfigurationProvider provider,
         try (FileWriter writer = new FileWriter(createIfAbsent(file).toFile())) {
             // emit to node tree
             Context context = provider.newEmitContext(this);
-            Node node = schema.emit(context);
+            RawNode node = schema.emit(context);
 
             // save node tree
             provider.rawProvider().write(node, writer);
 
             return this;
         } catch (Exception e) {
+            if (e instanceof AspenException aspenException)
+                throw aspenException;
             throw new IllegalStateException("Profile '" + name + "' save failed file(" + file + ")", e);
         }
     }

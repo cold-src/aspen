@@ -1,4 +1,4 @@
-package net.orbyfied.aspen.raw;
+package net.orbyfied.aspen.raw.nodes;
 
 public enum ValueStyle {
 

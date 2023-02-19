@@ -10,7 +10,7 @@ public class SectionSchema extends Schema {
     public SectionSchema(Schema parent,
                          String name,
                          Object instance) {
-        super(parent, name, instance);
+        super(parent.provider, parent, name, instance);
     }
 
 }

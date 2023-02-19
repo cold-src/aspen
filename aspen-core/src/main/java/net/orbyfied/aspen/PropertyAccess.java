@@ -9,6 +9,7 @@ import net.orbyfied.aspen.context.PropertyContext;
  *
  * @param <T> The value type.
  */
+@SuppressWarnings({ "rawtypes", "unchecked" })
 public interface PropertyAccess<T> {
 
     /**
@@ -22,17 +23,28 @@ public interface PropertyAccess<T> {
      */
     @SuppressWarnings("unchecked")
     static <T> PropertyAccess<T> future(Property<T, ?> property) {
-        return new Future(property);
+        return new PropertyFuture(property);
     }
 
-    @SuppressWarnings({ "rawtypes", "unchecked" })
-    class Future implements PropertyAccess {
-        Property property;
-        PropertyAccess access;
+    /**
+     * Creates a placeholder access which can
+     * be used to find and specify the exact which
+     * needs to be accessed.
+     *
+     * @param path The property path.
+     * @param <T> The value type.
+     * @return The future access instance.
+     */
+    static <T> PropertyAccess<T> find(String path) {
+        return new FindFuture(path);
+    }
 
-        Future(Property property) {
-            this.property = property;
-        }
+    /*
+        Placeholders
+     */
+
+    class Future implements PropertyAccess {
+        PropertyAccess access;
 
         @Override
         public void set(Object value) {
@@ -53,6 +65,20 @@ public interface PropertyAccess<T> {
             if (access == null)
                 throw new IllegalStateException("Uncompleted accessor");
             return access.has();
+        }
+    }
+
+    class PropertyFuture extends Future {
+        Property property;
+        public PropertyFuture(Property property) {
+            this.property = property;
+        }
+    }
+
+    class FindFuture extends Future {
+        String path;
+        public FindFuture(String path) {
+            this.path = path;
         }
     }
 

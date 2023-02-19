@@ -1,13 +1,14 @@
 package net.orbyfied.aspen;
 
 import net.orbyfied.aspen.context.Operation;
+import net.orbyfied.aspen.raw.RawContext;
 import org.jetbrains.annotations.Nullable;
 
 /**
  * Represents a context in which properties
  * can be loaded, modified and saves.
  */
-public class Context {
+public class Context implements RawContext {
 
     // the configuration provider
     final ConfigurationProvider provider;

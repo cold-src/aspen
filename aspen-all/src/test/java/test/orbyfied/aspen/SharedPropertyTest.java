@@ -13,8 +13,8 @@ public class SharedPropertyTest {
     void test() {
         Options1 o1 = new Options1();
         Options2 o2 = new Options2();
-        OptionProfile p1 = compose(o1);
-        OptionProfile p2 = compose(o2);
+        OptionProfile p1 = Tests.compose(o1);
+        OptionProfile p2 = Tests.compose(o2);
 
         o1.a.set(true);
         o2.a.set(false);
@@ -30,16 +30,6 @@ public class SharedPropertyTest {
 
         Assertions.assertEquals(true, o1.a.get());
         Assertions.assertEquals(false, o2.a.get());
-    }
-
-    static OptionProfile compose(Object instance) {
-        String name = instance.getClass().getSimpleName().toLowerCase();
-        return Tests.configurationProvider()
-                .composeProfile(
-                        name,
-                        instance,
-                        Tests.file(name + ".yml")
-                );
     }
 
     static final SimpleProperty<Boolean> A = SimpleProperty.builder("a", Boolean.class)

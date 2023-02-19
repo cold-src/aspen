@@ -3,6 +3,7 @@ package net.orbyfied.aspen;
 import net.orbyfied.aspen.annotation.Defaults;
 import net.orbyfied.aspen.annotation.Docs;
 import net.orbyfied.aspen.context.ComposeContext;
+import net.orbyfied.aspen.context.OptionComposeContext;
 import net.orbyfied.aspen.context.ProfileLoadOperation;
 import net.orbyfied.aspen.context.ProfileEmitOperation;
 import net.orbyfied.aspen.properties.SimpleProperty;
@@ -16,8 +17,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.BiConsumer;
-import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 /**
@@ -30,29 +30,29 @@ import java.util.function.Predicate;
 public class ConfigurationProvider {
 
     static <P extends Property, B extends Property.Builder>
-    OptionComposer<P, B> builtInProcessor(int exactness,
-                                          Predicate<Class<?>> predicate,
-                                          BiFunction<String, Class<?>, B> opener,
-                                          BiConsumer<B, AnnotatedElement> configureFunc) {
-        return new OptionComposer<P, B>() {
+    OptionComposer builtInProcessor(int exactness,
+                                    Predicate<OptionComposeContext> predicate,
+                                    Predicate<OptionComposeContext> opener,
+                                    Consumer<OptionComposeContext> configureFunc) {
+        return new OptionComposer() {
             @Override
             public int exactness() {
                 return exactness;
             }
 
             @Override
-            public boolean matches(ConfigurationProvider provider, Schema schema, Class<?> type) {
-                return predicate.test(type);
+            public boolean matches(OptionComposeContext context) {
+                return predicate.test(context);
             }
 
             @Override
-            public B open(ConfigurationProvider provider, Schema schema, String name, Class<?> type, AnnotatedElement field) throws Exception {
-                return opener.apply(name, type);
+            public boolean open(OptionComposeContext context) throws Exception {
+                return opener.test(context);
             }
 
             @Override
-            public void configure(ConfigurationProvider provider, Schema schema, AnnotatedElement field, B builder) throws Exception {
-                configureFunc.accept(builder, field);
+            public void configure(OptionComposeContext context) throws Exception {
+                configureFunc.accept(context);
             }
         };
     }
@@ -64,17 +64,18 @@ public class ConfigurationProvider {
         }
 
         @Override
-        public boolean matches(ConfigurationProvider provider, Schema schema, Class type) {
+        public boolean matches(OptionComposeContext context) {
             return true;
         }
 
         @Override
-        public Property.Builder open(ConfigurationProvider provider, Schema schema, String name, Class type, AnnotatedElement field) throws Exception {
-            return SimpleProperty.builder(name, type);
+        public boolean open(OptionComposeContext context) throws Exception {
+            context.builder(SimpleProperty.builder(context.name(), context.type()));
+            return true;
         }
 
         @Override
-        public void configure(ConfigurationProvider provider, Schema schema, AnnotatedElement field, Property.Builder builder) throws Exception {
+        public void configure(OptionComposeContext context) throws Exception {
 
         }
     };
@@ -171,16 +172,16 @@ public class ConfigurationProvider {
     private RawProvider rawProvider = null;
 
     // the registered property behaviours
-    private final Map<Class<?>, PropertyBehaviour> propertyBehaviourMap = new HashMap<>();
+    private Map<Class<?>, PropertyBehaviour> propertyBehaviourMap = new HashMap<>();
 
     // the registered profiles
     private final Map<String, OptionProfile> profileMap = new HashMap<>();
 
     // the registered option composers
-    private final List<OptionComposer> optionComposers = new ArrayList<>();
+    private List<OptionComposer> optionComposers = new ArrayList<>();
 
     // the schema composers
-    private final List<SchemaComposer> schemaComposers = new ArrayList<>();
+    private List<SchemaComposer> schemaComposers = new ArrayList<>();
 
     {
         /* default option processors */
@@ -226,18 +227,16 @@ public class ConfigurationProvider {
 
     /**
      * Finds the correct option composers for
-     * the given type and builds a pipeline.
+     * the given context and builds a pipeline.
      *
-     * @param schema The schema for context.
-     * @param type The type.
+     * @param context The context.
      * @return The pipeline.
      */
-    public OptionComposer findOptionComposerPipeline(Schema schema, Class<?> type) {
+    public OptionComposer findOptionComposerPipeline(OptionComposeContext context) {
         List<OptionComposer> processors = new ArrayList<>();
         for (OptionComposer processor : this.optionComposers) {
             if (processor.matches(
-                    this, schema,
-                    type
+                    context
             )) {
                 processors.add(processor);
             }
@@ -265,6 +264,16 @@ public class ConfigurationProvider {
         }
 
         return SchemaComposer.orderedPipeline(composers);
+    }
+
+    public ConfigurationProvider withSchemaComposer(SchemaComposer composer) {
+        schemaComposers.add(composer);
+        return this;
+    }
+
+    public ConfigurationProvider removeSchemaComposer(SchemaComposer composer) {
+        schemaComposers.remove(composer);
+        return this;
     }
 
     /**
@@ -304,6 +313,12 @@ public class ConfigurationProvider {
         }
     }
 
+    public OptionProfile composeProfile(String name,
+                                        Object instance,
+                                        Path path) {
+        return composeProfile(name, instance, path, null);
+    }
+
     /**
      * Attempts to parse properties from
      * the given instance and then
@@ -313,7 +328,8 @@ public class ConfigurationProvider {
      */
     public OptionProfile composeProfile(String name,
                                         Object instance,
-                                        Path path) {
+                                        Path path,
+                                        Consumer<OptionProfile> preCompose) {
         try {
             Class<?> klass = instance.getClass();
 
@@ -328,6 +344,11 @@ public class ConfigurationProvider {
             if (klass.isAnnotationPresent(Docs.class)) {
                 profile.schema().setComment(klass.getAnnotation(Docs.class).inLine());
             }
+
+            if (preCompose != null)
+                preCompose.accept(profile);
+
+            profile.compose();
 
             return profile;
         } catch (Exception e) {
@@ -353,12 +374,26 @@ public class ConfigurationProvider {
 
     /**
      * Create a new context to execute
-     * a compose operation.
+     * a schema compose operation.
      *
      * @return The context.
      */
     public ComposeContext newSchemaComposeContext(Schema schema) {
         return new ComposeContext(this, null, schema);
+    }
+
+    /**
+     * Create a new context to execute
+     * an option compose operation.
+     *
+     * @return The context.
+     */
+    public OptionComposeContext newOptionComposeContext(Schema schema,
+                                                        String name,
+                                                        AnnotatedElement element,
+                                                        Class<?> type) {
+        return new OptionComposeContext(this, null, schema,
+                name, type, element);
     }
 
     /**
@@ -379,6 +414,30 @@ public class ConfigurationProvider {
      */
     public Context newEmitContext(OptionProfile profile) {
         return new Context(this, new ProfileEmitOperation(profile), profile.schema());
+    }
+
+    /**
+     * Fork into a new instance with all
+     * settings retained but unlinked.
+     *
+     * Does not copy over the registered option
+     * profiles.
+     *
+     * Will not deep copy the raw provider, or
+     * the values in the collections.
+     *
+     * @return The new instance.
+     */
+    public ConfigurationProvider fork() {
+        ConfigurationProvider res = new ConfigurationProvider();
+
+        res.rawProvider = rawProvider;
+        res.processAnnotations = processAnnotations;
+        res.schemaComposers = new ArrayList<>(schemaComposers);
+        res.optionComposers = new ArrayList<>(optionComposers);
+        res.propertyBehaviourMap = new HashMap<>(propertyBehaviourMap);
+
+        return res;
     }
 
 }

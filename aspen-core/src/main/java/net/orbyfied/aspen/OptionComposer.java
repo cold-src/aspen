@@ -1,9 +1,12 @@
 package net.orbyfied.aspen;
 
+import net.orbyfied.aspen.context.OptionComposeContext;
+
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 import java.util.Comparator;
 import java.util.List;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 /**
@@ -11,8 +14,7 @@ import java.util.function.Consumer;
  * annotations on specific types of option
  * fields.
  */
-@SuppressWarnings({ "rawtypes", "unchecked" })
-public interface OptionComposer<P extends Property, B extends Property.Builder> {
+public interface OptionComposer {
 
     static OptionComposer orderedPipeline(List<OptionComposer> list) {
         list.sort(Comparator.comparingInt(OptionComposer::exactness));
@@ -27,23 +29,49 @@ public interface OptionComposer<P extends Property, B extends Property.Builder> 
             }
 
             @Override
-            public boolean matches(ConfigurationProvider provider, Schema schema, Class type) {
+            public boolean matches(OptionComposeContext context) {
                 return true;
             }
 
             @Override
-            public Property.Builder open(ConfigurationProvider provider, Schema schema, String name, Class type, AnnotatedElement field) throws Exception {
-                return list.get(0).open(
-                        provider, schema, name, type, field);
+            public boolean open(OptionComposeContext context) throws Exception {
+                final int l = list.size();
+                for (int i = 0; i < l; i++)
+                    if (list.get(i).open(context))
+                        return true;
+                return false;
             }
 
             @Override
-            public void configure(ConfigurationProvider provider, Schema schema, AnnotatedElement field, Property.Builder builder) throws Exception {
+            public void configure(OptionComposeContext context) throws Exception {
                 for (int i = list.size() - 1; i >= 0; i--) {
-                    list.get(i)
-                            .configure(
-                                    provider, schema, field, builder);
+                    list.get(i).configure(context);
                 }
+            }
+        };
+    }
+
+    static <A extends Annotation> OptionComposer configureAllAnnotated(Class<A> annotation,
+                                                                       BiConsumer<OptionComposeContext, A> consumer) {
+        return new OptionComposer() {
+            @Override
+            public int exactness() {
+                return 10;
+            }
+
+            @Override
+            public boolean matches(OptionComposeContext context) {
+                return context.element().isAnnotationPresent(annotation);
+            }
+
+            @Override
+            public boolean open(OptionComposeContext context) throws Exception {
+                return false;
+            }
+
+            @Override
+            public void configure(OptionComposeContext context) throws Exception {
+                consumer.accept(context, context.element().getAnnotation(annotation));
             }
         };
     }
@@ -75,49 +103,35 @@ public interface OptionComposer<P extends Property, B extends Property.Builder> 
      * If this composer is applicable to
      * the given type in the given context.
      *
-     * @param provider The provider.
-     * @param schema The schema.
-     * @param type The type.
+     * @param context The context.
      * @return True/false.
      */
-    boolean matches(ConfigurationProvider provider,
-                    Schema schema,
-                    Class<?> type);
+    boolean matches(OptionComposeContext context);
 
     /**
      * Creates a new property builder for
      * the given type and name in the provided
      * context.
      *
+     * The builder should be set through
+     * {@link OptionComposeContext#builder(Property.Builder)}
+     *
      * This is only called on the most exact
      * composer out of a pipeline.
      *
-     * @param provider The provider.
-     * @param schema The schema.
-     * @param name The name of the property.
-     * @param type The type of the property.
-     * @param field The option field.
-     * @return The builder.
+     * @param context The context.
      * @throws Exception Any exceptions that might occur.
+     * @return If the open succeeded, if false is returned in a pipeline,
+     *         the pipeline will continue to the next composer to open it.
      */
-    B open(ConfigurationProvider provider,
-           Schema schema,
-           String name,
-           Class<?> type,
-           AnnotatedElement field) throws Exception;
+    boolean open(OptionComposeContext context) throws Exception;
 
     /**
      * Configures the property.
      *
-     * @param provider The provider.
-     * @param schema The schema.
-     * @param field The option field.
-     * @param builder The property builder.
+     * @param context The context.
      * @throws Exception Any exceptions that might occur.
      */
-    void configure(ConfigurationProvider provider,
-                   Schema schema,
-                   AnnotatedElement field,
-                   B builder) throws Exception;
+    void configure(OptionComposeContext context) throws Exception;
 
 }

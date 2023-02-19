@@ -1,5 +1,7 @@
 package net.orbyfied.aspen.raw;
 
+import net.orbyfied.aspen.raw.nodes.RawNode;
+
 import java.io.Reader;
 import java.io.Writer;
 
@@ -18,7 +20,7 @@ public interface RawProvider {
      * @param node The node.
      * @param writer The writer.
      */
-    void write(Node node, Writer writer);
+    void write(RawNode node, Writer writer);
 
     /**
      * Parses the input from the reader into
@@ -27,6 +29,6 @@ public interface RawProvider {
      * @param reader The reader.
      * @return The node.
      */
-    Node compose(Reader reader);
+    RawNode compose(Reader reader);
 
 }

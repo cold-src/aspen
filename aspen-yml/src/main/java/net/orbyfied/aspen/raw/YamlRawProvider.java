@@ -1,5 +1,7 @@
 package net.orbyfied.aspen.raw;
 
+import net.orbyfied.aspen.raw.nodes.*;
+import net.orbyfied.aspen.raw.source.NodeSource;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
@@ -14,16 +16,15 @@ import java.io.Reader;
 import java.io.Writer;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 
 import static net.orbyfied.aspen.raw.YamlSupport.*;
 
 /**
- * An {@link RawProvider} which utilizes SnakeYAML.
+ * An {@link NodeSpecProvider} which utilizes SnakeYAML.
  */
 @SuppressWarnings({ "unchecked", "rawtypes" })
-public class YamlRawProvider implements RawProvider {
+public class YamlRawProvider extends NodeSpecProvider<Node> {
 
     public static Builder builder() {
         return new Builder();
@@ -160,18 +161,13 @@ public class YamlRawProvider implements RawProvider {
     }
 
     @Override
-    public void write(Node node, Writer writer) {
-        org.yaml.snakeyaml.nodes.Node yamlNode = toYamlNode(node);
-
-        yaml.serialize(yamlNode, writer);
+    protected void writeTree(Node node, Writer writer) {
+        yaml.serialize(node, writer);
     }
 
     @Override
-    public Node compose(Reader reader) {
-        org.yaml.snakeyaml.nodes.Node yamlNode = yaml.compose(reader);
-
-        Node node = fromYamlNode(yamlNode);
-        return node;
+    protected Node readTree(Reader reader) {
+        return yaml.compose(reader);
     }
 
     /*
@@ -189,23 +185,27 @@ public class YamlRawProvider implements RawProvider {
         return out;
     }
 
-    org.yaml.snakeyaml.nodes.Node addComments(Node src, org.yaml.snakeyaml.nodes.Node res) {
-        if (src.blockComment != null) res.setBlockComments(toCommentLines(src.blockComment, CommentType.BLOCK));
-        if (src.inLineComment != null) res.setInLineComments(toCommentLines(src.inLineComment, CommentType.IN_LINE));
-        if (src.endComment != null) res.setEndComments(toCommentLines(src.endComment, CommentType.BLOCK));
+    org.yaml.snakeyaml.nodes.Node addComments(RawNode src, org.yaml.snakeyaml.nodes.Node res) {
+        if (src.blockCommentLines() != null) res.setBlockComments(toCommentLines(src.blockCommentLines(), CommentType.BLOCK));
+        if (src.inLineCommentLines() != null) res.setInLineComments(toCommentLines(src.inLineCommentLines(), CommentType.IN_LINE));
+        if (src.endCommentLines() != null) res.setEndComments(toCommentLines(src.endCommentLines(), CommentType.BLOCK));
         return res;
     }
 
     // convert a raw node to a snakeyaml node
-    org.yaml.snakeyaml.nodes.Node toYamlNode(Node node) {
+    @Override
+    protected org.yaml.snakeyaml.nodes.Node fromRawBase(RawNode node) {
         // mapping node
-        if (node instanceof MapNode mapNode) {
+        if (node instanceof RawMapNode mapNode) {
             List<NodeTuple> outList = new ArrayList<>();
-            for (Map.Entry<String, ValueNode> entry : mapNode.getValue().entrySet()) {
-                ScalarNode keyNode = new ScalarNode(Tag.STR, entry.getKey(), null, null, mapKeyStyle);
-                org.yaml.snakeyaml.nodes.Node valueNode = toYamlNode(entry.getValue());
+            for (RawNode node1 : mapNode.getNodes()) {
+                // check for pair
+                if (node1 instanceof RawPairNode pairNode) {
+                    ScalarNode keyNode = new ScalarNode(Tag.STR, ((RawScalarNode<String>)pairNode.getKey()).getValue(), null, null, mapKeyStyle);
+                    org.yaml.snakeyaml.nodes.Node valueNode = fromRaw(pairNode.getValue());
 
-                outList.add(new NodeTuple(keyNode, valueNode));
+                    outList.add(new NodeTuple(keyNode, valueNode));
+                }
             }
 
             MappingNode mappingNode = new MappingNode(Tag.MAP, true, outList, null, null, mapFlowStyle);
@@ -213,10 +213,10 @@ public class YamlRawProvider implements RawProvider {
         }
 
         // list node
-        if (node instanceof ListNode listNode) {
-            List<org.yaml.snakeyaml.nodes.Node> values = new ArrayList<>(listNode.getValue().size());
-            for (ValueNode node1 : listNode.getValue()) {
-                values.add(toYamlNode(node1));
+        if (node instanceof RawListNode listNode) {
+            List<org.yaml.snakeyaml.nodes.Node> values = new ArrayList<>(listNode.getNodes().size());
+            for (RawNode node1 : listNode.getNodes()) {
+                values.add(fromRaw(node1));
             }
 
             SequenceNode sequenceNode = new SequenceNode(Tag.SEQ, true, values, null, null, listFlowStyle);
@@ -224,59 +224,62 @@ public class YamlRawProvider implements RawProvider {
         }
 
         // scalar node
-        if (node instanceof ValueNode valueNode) {
+        if (node instanceof RawScalarNode valueNode) {
             Object value = valueNode.getValue();
             if (value == null)
                 return addComments(node, new ScalarNode(Tag.NULL, "null", null, null,
-                        toScalarStyle(valueNode.style)));
+                        toScalarStyle(valueNode.getStyle())));
 
             // represent value
-            Tag tag; Class<?> vt = valueNode.value.getClass();
+            Tag tag; Class<?> vt = valueNode.getValue().getClass();
             tag = getScalarTypeTag(vt);
 
             return addComments(node, new ScalarNode(tag, Objects.toString(value), null, null,
-                    toScalarStyle(valueNode.style)));
+                    toScalarStyle(valueNode.getStyle())));
         }
 
         throw new IllegalArgumentException("Unsupported node " + node.getClass());
     }
 
     // converts a snakeyaml node to a raw node
-    Node fromYamlNode(org.yaml.snakeyaml.nodes.Node node) {
+    @Override
+    protected RawNode toRawBase(org.yaml.snakeyaml.nodes.Node node) {
         // mapping node
         if (node instanceof MappingNode mappingNode) {
-            MapNode mapNode = new MapNode();
+            RawMapNode mapNode = new RawMapNode();
             for (NodeTuple tuple : mappingNode.getValue()) {
-                mapNode.value.put(((ScalarNode)tuple.getKeyNode()).getValue(),
-                        (ValueNode) fromYamlNode(tuple.getValueNode()));
+                mapNode.getNodes().add(
+                        new RawPairNode(toRawBase(tuple.getKeyNode()), toRawBase(tuple.getValueNode()))
+                );
             }
 
-            return mapNode;
+            return mapNode.source(newNodeSource(mappingNode.getStartMark()));
         }
 
         // collection node
         if (node instanceof CollectionNode collectionNode) {
-            ListNode listNode = new ListNode();
+            RawListNode listNode = new RawListNode();
             for (Object item : collectionNode.getValue()) {
                 if (item instanceof org.yaml.snakeyaml.nodes.Node node1)
-                    listNode.addElement((ValueNode) fromYamlNode(node1));
+                    listNode.addElement(toRawBase(node1));
                 else
-                    listNode.addElement(new ValueNode(item));
+                    listNode.addElement(new RawScalarNode(item));
             }
 
-            return listNode;
+            return listNode.source(newNodeSource(collectionNode.getStartMark()));
         }
 
         // value node
         if (node instanceof ScalarNode scalarNode) {
+            NodeSource source = newNodeSource(scalarNode.getStartMark());
             if (node.getTag() == Tag.NULL)
-                return new ValueNode<>(null);
+                return new RawScalarNode<>(null).source(source);
             String strValue = scalarNode.getValue();
 
             if (scalarNode.isPlain() && strValue.equalsIgnoreCase("null"))
-                return new ValueNode<>(null);
+                return new RawScalarNode<>(null).source(source);
 
-            return new ValueNode<>(yaml.load(strValue));
+            return new RawScalarNode<>(yaml.load(strValue)).source(source);
         }
 
         // throw exception

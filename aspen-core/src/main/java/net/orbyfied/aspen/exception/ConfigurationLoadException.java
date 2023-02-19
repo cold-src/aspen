@@ -1,6 +1,6 @@
 package net.orbyfied.aspen.exception;
 
-public class ConfigurationLoadException extends RuntimeException {
+public class ConfigurationLoadException extends AspenException {
 
     public ConfigurationLoadException(String message) {
         super(message);

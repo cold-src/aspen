@@ -1,8 +1,8 @@
 package net.orbyfied.aspen.properties;
 
 import net.orbyfied.aspen.Property;
-import net.orbyfied.aspen.raw.ListNode;
-import net.orbyfied.aspen.raw.ValueNode;
+import net.orbyfied.aspen.raw.nodes.RawListNode;
+import net.orbyfied.aspen.raw.nodes.RawNode;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -68,8 +68,8 @@ public abstract class CollectionProperty<E> extends Property<Collection<E>, List
     }
 
     @Override
-    protected ValueNode emitValue0(Collection<E> value) {
-        ListNode node = new ListNode();
+    protected RawNode emitValue0(Collection<E> value) {
+        RawListNode node = new RawListNode();
         for (E elem : value) {
             node.addElement(embedded.emitValue(elem));
         }
@@ -78,11 +78,11 @@ public abstract class CollectionProperty<E> extends Property<Collection<E>, List
     }
 
     @Override
-    protected Collection<E> loadValue0(ValueNode node) {
-        if (!(node instanceof ListNode listNode))
+    protected Collection<E> loadValue0(RawNode node) {
+        if (!(node instanceof RawListNode listNode))
             throw new IllegalStateException("Not a list node");
         Collection<E> collection = newCollection();
-        for (ValueNode elem : listNode.getValue()) {
+        for (RawNode elem : listNode.getNodes()) {
             collection.add((E) embedded.loadValue(elem));
         }
 

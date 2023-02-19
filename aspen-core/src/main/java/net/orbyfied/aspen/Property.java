@@ -1,10 +1,10 @@
 package net.orbyfied.aspen;
 
 import net.orbyfied.aspen.context.PropertyContext;
+import net.orbyfied.aspen.exception.PropertyExceptions;
 import net.orbyfied.aspen.exception.PropertyLoadException;
-import net.orbyfied.aspen.raw.Node;
-import net.orbyfied.aspen.raw.ValueNode;
-import org.jetbrains.annotations.Contract;
+import net.orbyfied.aspen.raw.nodes.RawNode;
+import net.orbyfied.aspen.raw.nodes.RawScalarNode;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -37,7 +37,7 @@ import java.util.function.Supplier;
  * @author orbyfied
  */
 @SuppressWarnings({ "unchecked", "rawtypes" })
-public class Property<T, P> implements NodeLike {
+public class Property<T, P> implements BaseRepresentable {
 
     /**
      * Builder classifier for typed properties, which need
@@ -57,7 +57,7 @@ public class Property<T, P> implements NodeLike {
 
         protected ConfigurationProvider provider;
 
-        protected Consumer<Node> commenter;
+        protected Consumer<RawNode> commenter;
         protected Accessor<T> accessor;
 
         protected List<PropertyComponent> components = new ArrayList<>();
@@ -103,7 +103,7 @@ public class Property<T, P> implements NodeLike {
             return this;
         }
 
-        public Builder<T, P, R> commenter(Consumer<Node> commenter) {
+        public Builder<T, P, R> commenter(Consumer<RawNode> commenter) {
             this.commenter = commenter;
             return this;
         }
@@ -182,7 +182,7 @@ public class Property<T, P> implements NodeLike {
     protected Class<P> primitiveType;
 
     // the comment in the generated file
-    protected Consumer<Node> commenter;
+    protected Consumer<RawNode> commenter;
 
     // the value accessor
     protected Accessor<T> accessor;
@@ -231,13 +231,6 @@ public class Property<T, P> implements NodeLike {
 
     public Schema getSchema() {
         return schema;
-    }
-
-    // fail parsing of the property
-    // with a message
-    @Contract("_ -> fail")
-    protected <T2> T2 failLoad(String s) {
-        throw new PropertyLoadException(getClass().getSimpleName() + "(" + name + "): " + s);
     }
 
     public <C extends PropertyComponent> C component(Class<C> cClass) {
@@ -320,8 +313,10 @@ public class Property<T, P> implements NodeLike {
     }
 
     // load value impl
-    protected T loadValue0(ValueNode node) {
-        return valueFromPrimitive((P) node.getValue());
+    protected T loadValue0(RawNode node) {
+        if (!(node instanceof RawScalarNode<?> scalarNode))
+            return PropertyExceptions.failValueError("Non-scalar node given to load as primitive");
+        return valueFromPrimitive((P) scalarNode.getValue());
     }
 
     /**
@@ -333,21 +328,27 @@ public class Property<T, P> implements NodeLike {
      * @param node The node.
      * @return The value.
      */
-    public T loadValue(ValueNode node) {
-        T val = loadValue0(node);
+    public T loadValue(RawNode node) {
+        try {
+            T val = loadValue0(node);
 
-        // pass through components
-        for (PropertyComponent component : componentMap.values()) {
-            component.checkLoadedValue(val);
+            // pass through components
+            if (componentMap != null) {
+                for (PropertyComponent component : componentMap.values()) {
+                    component.checkLoadedValue(val);
+                }
+            }
+
+            return val;
+        } catch (Exception e) {
+             throw new PropertyLoadException("<cause>", e, this, node);
         }
-
-        return val;
     }
 
     // emit value impl
-    protected ValueNode emitValue0(T value) {
+    protected RawNode emitValue0(T value) {
         P primitiveValue = valueToPrimitive(value);
-        return new ValueNode<>(primitiveValue);
+        return new RawScalarNode<>(primitiveValue);
     }
 
     /**
@@ -359,35 +360,35 @@ public class Property<T, P> implements NodeLike {
      * @param value The value.
      * @return The node.
      */
-    public ValueNode emitValue(T value) {
+    public RawNode emitValue(T value) {
         return emitValue0(value);
     }
 
     @Override
-    public ValueNode emit(Context context) {
-        Node node = emitValue0(get(getPropertyContextOrLocal(context)));
+    public RawNode emit(Context context) {
+        RawNode node = emitValue(get(getPropertyContextOrLocal(context)));
         if (commenter != null)
             commenter.accept(node);
-        return (ValueNode) node;
+        return node;
     }
 
     @Override
-    public void load(Context context, ValueNode node) {
-        set(getPropertyContextOrLocal(context), loadValue0(node));
+    public void load(Context context, RawNode node) {
+        set(getPropertyContextOrLocal(context), loadValue(node));
     }
 
-    public ValueNode emit() {
+    public RawNode emit() {
         return emit(null);
     }
 
-    public void load(ValueNode node) {
+    public void load(RawNode node) {
         load(null, node);
     }
 
     /* Getters */
 
     @Override
-    public NodeLike getParent() {
+    public BaseRepresentable getParent() {
         return null; // TODO
     }
 
@@ -406,6 +407,32 @@ public class Property<T, P> implements NodeLike {
 
     public Accessor<T> getAccessor() {
         return accessor;
+    }
+
+    public String getPath() {
+        if (schema == null)
+            return "$" + name;
+        return schema.getPath() + "/" + name;
+    }
+
+    public String toPrettyString() {
+        return getClass().getSimpleName() + "(" + getPath() + ")";
+    }
+
+    @Override
+    public String toString() {
+        return getClass().getSimpleName() + "(" +
+                "provider=" + provider +
+                ", name='" + name + '\'' +
+                ", complexType=" + complexType +
+                ", primitiveType=" + primitiveType +
+                ", commenter=" + commenter +
+                ", accessor=" + accessor +
+                ", actualAccessor=" + actualAccessor +
+                ", schema=" + schema +
+                ", componentMap=" + componentMap +
+                ", localContext=" + localContext +
+                ')';
     }
 
 }

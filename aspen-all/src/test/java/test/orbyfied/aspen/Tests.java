@@ -1,10 +1,12 @@
 package test.orbyfied.aspen;
 
 import net.orbyfied.aspen.ConfigurationProvider;
+import net.orbyfied.aspen.OptionProfile;
 import net.orbyfied.aspen.raw.YamlRawProvider;
 import org.yaml.snakeyaml.DumperOptions;
 
 import java.nio.file.Path;
+import java.util.function.Consumer;
 
 public class Tests {
 
@@ -17,6 +19,49 @@ public class Tests {
                     .setSpacedComments(true)
                     .build()
             );
+
+    public static OptionProfile compose(Object instance) {
+        String name = instance.getClass().getSimpleName().toLowerCase();
+        return Tests.configurationProvider()
+                .composeProfile(
+                        name,
+                        instance,
+                        Tests.file(name + ".yml")
+                );
+    }
+
+    public static OptionProfile compose(ConfigurationProvider provider, Object instance) {
+        String name = instance.getClass().getSimpleName().toLowerCase();
+        return provider
+                .composeProfile(
+                        name,
+                        instance,
+                        Tests.file(name + ".yml")
+                );
+    }
+
+    public static OptionProfile compose(Object instance, Consumer<OptionProfile> consumer) {
+        String name = instance.getClass().getSimpleName().toLowerCase();
+        return Tests.configurationProvider()
+                .composeProfile(
+                        name,
+                        instance,
+                        Tests.file(name + ".yml"),
+                        consumer
+                );
+    }
+
+    public static OptionProfile compose(ConfigurationProvider provider, Object instance,
+                                        Consumer<OptionProfile> consumer) {
+        String name = instance.getClass().getSimpleName().toLowerCase();
+        return provider
+                .composeProfile(
+                        name,
+                        instance,
+                        Tests.file(name + ".yml"),
+                        consumer
+                );
+    }
 
     public static ConfigurationProvider configurationProvider() {
         return CONFIGURATION_PROVIDER;

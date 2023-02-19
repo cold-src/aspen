@@ -4,7 +4,7 @@ package net.orbyfied.aspen.exception;
  * An exception which occurs when schema composing
  * failed.
  */
-public class SchemaComposeException extends RuntimeException {
+public class SchemaComposeException extends AspenException {
 
     public SchemaComposeException(String message) {
         super(message);

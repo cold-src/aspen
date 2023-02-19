@@ -1,11 +1,11 @@
-package net.orbyfied.aspen.raw;
+package net.orbyfied.aspen.raw.nodes;
 
 import java.util.Objects;
 
 /**
  * A node which holds a value.
  */
-public class ValueNode<T> extends Node {
+public class RawScalarNode<T> extends RawValueNode {
 
     // the value of the node
     T value;
@@ -13,14 +13,14 @@ public class ValueNode<T> extends Node {
     // the value style of this node
     ValueStyle style = ValueStyle.PLAIN;
 
-    public ValueNode() { }
+    public RawScalarNode() { }
 
-    public ValueNode(T value) {
+    public RawScalarNode(T value) {
         this.value = value;
     }
 
     /** Set the value of this node. */
-    public ValueNode<T> setValue(T value) {
+    public RawScalarNode<T> setValue(T value) {
         this.value = value;
         return this;
     }
@@ -34,7 +34,7 @@ public class ValueNode<T> extends Node {
         return style;
     }
 
-    public ValueNode<T> setStyle(ValueStyle style) {
+    public RawScalarNode<T> setStyle(ValueStyle style) {
         this.style = style;
         return this;
     }
