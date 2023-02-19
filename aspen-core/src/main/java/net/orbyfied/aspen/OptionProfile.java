@@ -81,6 +81,7 @@ public record OptionProfile(ConfigurationProvider provider,
         try (FileReader reader = new FileReader(file.toFile())) {
             // compose node
             RawNode node = provider.rawProvider().compose(reader);
+            node = provider.preProcessRaw(node);
             if (!(node instanceof RawMapNode mapNode))
                 throw new ConfigurationLoadException("Composed configuration from file " + file + " is not a map node");
 
@@ -108,6 +109,7 @@ public record OptionProfile(ConfigurationProvider provider,
             // emit to node tree
             Context context = provider.newEmitContext(this);
             RawNode node = schema.emit(context);
+            node = provider.postProcessRaw(node);
 
             // save node tree
             provider.rawProvider().write(node, writer);

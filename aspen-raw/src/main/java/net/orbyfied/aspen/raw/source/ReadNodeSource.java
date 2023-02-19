@@ -18,7 +18,7 @@ public class ReadNodeSource implements NodeSource {
     public String toPrettyString() {
         if (location == null)
             return "unknown read source";
-        return "file(" + location.fileName() + ") line(" + location.line() + ") column(" + location.column() + ")";
+        return "file(" + location.file().getName() + ") line(" + location.line() + ") column(" + location.column() + ")";
     }
 
 }

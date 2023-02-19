@@ -7,6 +7,10 @@ import java.util.Objects;
  */
 public class RawScalarNode<T> extends RawValueNode {
 
+    public static <T> RawScalarNode<T> nullNode() {
+        return new RawScalarNode<>(null);
+    }
+
     // the value of the node
     T value;
 

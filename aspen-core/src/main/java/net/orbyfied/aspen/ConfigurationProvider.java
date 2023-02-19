@@ -8,6 +8,7 @@ import net.orbyfied.aspen.context.ProfileLoadOperation;
 import net.orbyfied.aspen.context.ProfileEmitOperation;
 import net.orbyfied.aspen.properties.SimpleProperty;
 import net.orbyfied.aspen.raw.RawProvider;
+import net.orbyfied.aspen.raw.nodes.RawNode;
 import net.orbyfied.aspen.util.Pair;
 import net.orbyfied.aspen.util.Throwables;
 
@@ -180,8 +181,11 @@ public class ConfigurationProvider {
     // the registered option composers
     private List<OptionComposer> optionComposers = new ArrayList<>();
 
-    // the schema composers
+    // the registered schema composers
     private List<SchemaComposer> schemaComposers = new ArrayList<>();
+
+    // the raw processors
+    private List<NodeTransformer> rawTransformers = new ArrayList<>();
 
     {
         /* default option processors */
@@ -438,6 +442,46 @@ public class ConfigurationProvider {
         res.propertyBehaviourMap = new HashMap<>(propertyBehaviourMap);
 
         return res;
+    }
+
+    public ConfigurationProvider withRawProcessor(NodeTransformer transformer) {
+        rawTransformers.add(transformer);
+        return this;
+    }
+
+    public ConfigurationProvider removeRawProcessor(NodeTransformer transformer) {
+        rawTransformers.remove(transformer);
+        return this;
+    }
+
+    /**
+     * Pre-processes the input data through
+     * the raw transformer pipeline.
+     *
+     * @param node The input node.
+     * @return The processed input node.
+     */
+    public RawNode preProcessRaw(RawNode node) {
+        for (NodeTransformer transformer : rawTransformers) {
+            node = transformer.preProcess(node);
+        }
+
+        return node;
+    }
+
+    /**
+     * Post-processes the given output data
+     * through the raw transformer pipeline.
+     *
+     * @param node The output node.
+     * @return The processed output node.
+     */
+    public RawNode postProcessRaw(RawNode node) {
+        for (NodeTransformer transformer : rawTransformers) {
+            node = transformer.postProcess(node);
+        }
+
+        return node;
     }
 
 }
