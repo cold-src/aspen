@@ -11,10 +11,14 @@ import net.orbyfied.aspen.raw.nodes.RawNode;
 import net.orbyfied.aspen.raw.nodes.RawPairNode;
 import net.orbyfied.aspen.raw.nodes.RawScalarNode;
 
+import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
-import java.util.*;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.function.Consumer;
 
 /**
  * A compilable schema holding properties
@@ -233,6 +237,69 @@ public abstract class Schema implements BaseRepresentable {
         return null;
     }
 
+    /**
+     * Composes a property from an annotated element
+     * and type provided by the context, in the context
+     * of this schema.
+     *
+     * This property does not automatically get registered
+     * to this schema.
+     *
+     * @param composeContext The compose context.
+     * @param preConfigure A function to call before configuring
+     *                     but after opening. Can be null to ignore.
+     * @return The property or null if failed.
+     * @throws SchemaComposeException If an error occurs.
+     */
+    public Property<?, ?> composeAnnotatedOption(OptionComposeContext composeContext,
+                                                 Consumer<OptionComposeContext> preConfigure)
+            throws SchemaComposeException
+    {
+        try {
+            OptionComposer composerPipeline = provider.findOptionComposerPipeline(composeContext);
+            if (/* open context */ !composerPipeline.open(composeContext)) {
+                throw new SchemaComposeException("Failed to open compose of option " + name);
+            }
+
+            if (preConfigure != null)
+                preConfigure.accept(composeContext);
+            composerPipeline.configure(composeContext); // configure context
+
+            return composeContext.builder().build();
+        } catch (SchemaComposeException e) {
+            throw e;
+        } catch (Throwable t) {
+            throw new SchemaComposeException(t);
+        }
+    }
+
+    /**
+     * Composes a property in a context derived
+     * from an annotated element and type provided,
+     * in the context of this schema.
+     *
+     * This property does not automatically get registered
+     * to this schema.
+     *
+     * @param name The name of the property.
+     * @param element The element to read annotations from.
+     * @param type The value/complex type of the property.
+     * @param preConfigure A function to call before configuring
+     *                     but after opening. Can be null to ignore.
+     * @return The property or null if failed.
+     * @throws SchemaComposeException If an error occurs.
+     */
+    public Property<?, ?> composeAnnotatedOption(String name,
+                                                 AnnotatedElement element,
+                                                 Class<?> type,
+                                                 Consumer<OptionComposeContext> preConfigure)
+            throws SchemaComposeException
+    {
+        OptionComposeContext composeContext =
+                new OptionComposeContext(provider, null, this, name, type, element);
+        return composeAnnotatedOption(composeContext, preConfigure);
+    }
+
     // base composer for the schema's
     // an instance method because i just
     // copied over the initial code lol
@@ -310,17 +377,14 @@ public abstract class Schema implements BaseRepresentable {
                     }
 
                     // create property
-                    OptionComposeContext composeContext = provider.newOptionComposeContext(this, name, field, type);
-                    OptionComposer composerPipeline = provider.findOptionComposerPipeline(composeContext);
-                    if (/* open context */ !composerPipeline.open(composeContext)) {
-                        throw new SchemaComposeException("Failed to open compose of option " + name + " on field " + field);
-                    }
-
-                    composeContext.builder() // standard accessor
-                            .accessor(Accessor.forField(this, field));
-                    composerPipeline.configure(composeContext); // configure context
-
-                    property = composeContext.builder().build();
+                    property = composeAnnotatedOption(
+                            name,
+                            field,
+                            type,
+                            // set default accessor
+                            // before starting configuration
+                            ctx -> ctx.builder().accessor(Accessor.forField(this, field))
+                    );
                     withProperty(property);
                 }
 
