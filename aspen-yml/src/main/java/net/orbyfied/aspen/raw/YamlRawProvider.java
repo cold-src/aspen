@@ -24,7 +24,7 @@ import static net.orbyfied.aspen.raw.YamlSupport.*;
  * An {@link NodeSpecProvider} which utilizes SnakeYAML.
  */
 @SuppressWarnings({ "unchecked", "rawtypes" })
-public class YamlRawProvider extends NodeSpecProvider<Node> {
+public class YamlRawProvider extends NodeSpecProvider<RawIOContext, Node> {
 
     public static Builder builder() {
         return new Builder();
@@ -161,12 +161,12 @@ public class YamlRawProvider extends NodeSpecProvider<Node> {
     }
 
     @Override
-    protected void writeTree(Node node, Writer writer) {
+    protected void writeTree(RawIOContext context, Node node, Writer writer) {
         yaml.serialize(node, writer);
     }
 
     @Override
-    protected Node readTree(Reader reader) {
+    protected Node readTree(RawIOContext context, Reader reader) {
         return yaml.compose(reader);
     }
 
@@ -194,62 +194,64 @@ public class YamlRawProvider extends NodeSpecProvider<Node> {
 
     // convert a raw node to a snakeyaml node
     @Override
-    protected org.yaml.snakeyaml.nodes.Node fromRawBase(RawNode node) {
+    protected org.yaml.snakeyaml.nodes.Node fromRawBase(RawIOContext context, RawNode rawNode) {
         // mapping node
-        if (node instanceof RawMapNode mapNode) {
+        if (rawNode instanceof RawObjectNode mapNode) {
             List<NodeTuple> outList = new ArrayList<>();
             for (RawNode node1 : mapNode.getNodes()) {
                 // check for pair
                 if (node1 instanceof RawPairNode pairNode) {
                     ScalarNode keyNode = new ScalarNode(Tag.STR, ((RawScalarNode<String>)pairNode.getKey()).getValue(), null, null, mapKeyStyle);
-                    org.yaml.snakeyaml.nodes.Node valueNode = fromRaw(pairNode.getValue());
+                    org.yaml.snakeyaml.nodes.Node valueNode = fromRaw(context, pairNode.getValue());
 
                     outList.add(new NodeTuple(keyNode, valueNode));
                 }
             }
 
             MappingNode mappingNode = new MappingNode(Tag.MAP, true, outList, null, null, mapFlowStyle);
-            return addComments(node, mappingNode);
+            return addComments(rawNode, mappingNode);
         }
 
         // list node
-        if (node instanceof RawListNode listNode) {
+        if (rawNode instanceof RawListNode listNode) {
             List<org.yaml.snakeyaml.nodes.Node> values = new ArrayList<>(listNode.getNodes().size());
             for (RawNode node1 : listNode.getNodes()) {
-                values.add(fromRaw(node1));
+                values.add(fromRaw(context, node1));
             }
 
             SequenceNode sequenceNode = new SequenceNode(Tag.SEQ, true, values, null, null, listFlowStyle);
-            return addComments(node, sequenceNode);
+            return addComments(rawNode, sequenceNode);
         }
 
         // scalar node
-        if (node instanceof RawScalarNode valueNode) {
+        if (rawNode instanceof RawScalarNode valueNode) {
             Object value = valueNode.getValue();
             if (value == null)
-                return addComments(node, new ScalarNode(Tag.NULL, "null", null, null,
+                return addComments(rawNode, new ScalarNode(Tag.NULL, "null", null, null,
                         toScalarStyle(valueNode.getStyle())));
 
             // represent value
             Tag tag; Class<?> vt = valueNode.getValue().getClass();
             tag = getScalarTypeTag(vt);
 
-            return addComments(node, new ScalarNode(tag, Objects.toString(value), null, null,
+            return addComments(rawNode, new ScalarNode(tag, Objects.toString(value), null, null,
                     toScalarStyle(valueNode.getStyle())));
         }
 
-        throw new IllegalArgumentException("Unsupported node " + node.getClass());
+        throw new IllegalArgumentException("Unsupported node " + rawNode.getClass());
     }
 
     // converts a snakeyaml node to a raw node
     @Override
-    protected RawNode toRawBase(org.yaml.snakeyaml.nodes.Node node) {
+    protected RawNode toRawBase(RawIOContext context, org.yaml.snakeyaml.nodes.Node yamlNode) {
         // mapping node
-        if (node instanceof MappingNode mappingNode) {
-            RawMapNode mapNode = new RawMapNode();
+        if (yamlNode instanceof MappingNode mappingNode) {
+            RawObjectNode mapNode = new RawObjectNode();
             for (NodeTuple tuple : mappingNode.getValue()) {
                 mapNode.getNodes().add(
-                        new RawPairNode(toRawBase(tuple.getKeyNode()), toRawBase(tuple.getValueNode()))
+                        new RawPairNode(
+                                toRaw(context, tuple.getKeyNode()),
+                                toRaw(context, tuple.getValueNode()))
                 );
             }
 
@@ -257,11 +259,11 @@ public class YamlRawProvider extends NodeSpecProvider<Node> {
         }
 
         // collection node
-        if (node instanceof CollectionNode collectionNode) {
+        if (yamlNode instanceof CollectionNode collectionNode) {
             RawListNode listNode = new RawListNode();
             for (Object item : collectionNode.getValue()) {
                 if (item instanceof org.yaml.snakeyaml.nodes.Node node1)
-                    listNode.addElement(toRawBase(node1));
+                    listNode.addElement(toRaw(context, node1));
                 else
                     listNode.addElement(new RawScalarNode(item));
             }
@@ -270,9 +272,9 @@ public class YamlRawProvider extends NodeSpecProvider<Node> {
         }
 
         // value node
-        if (node instanceof ScalarNode scalarNode) {
+        if (yamlNode instanceof ScalarNode scalarNode) {
             NodeSource source = newNodeSource(scalarNode.getStartMark());
-            if (node.getTag() == Tag.NULL)
+            if (yamlNode.getTag() == Tag.NULL)
                 return new RawScalarNode<>(null).source(source);
             String strValue = scalarNode.getValue();
 
@@ -283,7 +285,7 @@ public class YamlRawProvider extends NodeSpecProvider<Node> {
         }
 
         // throw exception
-        throw new IllegalArgumentException("Unsupported YAML node encountered: " + node.getClass());
+        throw new IllegalArgumentException("Unsupported YAML node encountered: " + yamlNode.getClass());
     }
 
 }

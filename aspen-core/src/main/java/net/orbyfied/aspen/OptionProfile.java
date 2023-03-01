@@ -1,8 +1,9 @@
 package net.orbyfied.aspen;
 
+import net.orbyfied.aspen.context.IOContext;
 import net.orbyfied.aspen.exception.AspenException;
 import net.orbyfied.aspen.exception.ConfigurationLoadException;
-import net.orbyfied.aspen.raw.nodes.RawMapNode;
+import net.orbyfied.aspen.raw.nodes.RawObjectNode;
 import net.orbyfied.aspen.raw.nodes.RawNode;
 import net.orbyfied.aspen.util.Throwables;
 
@@ -80,9 +81,10 @@ public record OptionProfile(ConfigurationProvider provider,
 
         try (FileReader reader = new FileReader(file.toFile())) {
             // compose node
-            RawNode node = provider.rawProvider().compose(reader);
+            IOContext ioContext = provider.newReadContext(this, file.getFileName().toString());
+            RawNode node = provider.rawProvider().compose(ioContext, reader);
             node = provider.preProcessRaw(node);
-            if (!(node instanceof RawMapNode mapNode))
+            if (!(node instanceof RawObjectNode mapNode))
                 throw new ConfigurationLoadException("Composed configuration from file " + file + " is not a map node");
 
             // load schema
@@ -112,7 +114,8 @@ public record OptionProfile(ConfigurationProvider provider,
             node = provider.postProcessRaw(node);
 
             // save node tree
-            provider.rawProvider().write(node, writer);
+            IOContext ioContext = provider.newWriteContext(this, file.getFileName().toString());
+            provider.rawProvider().write(ioContext, node, writer);
 
             return this;
         } catch (Exception e) {

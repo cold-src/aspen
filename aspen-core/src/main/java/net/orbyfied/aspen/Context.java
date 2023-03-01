@@ -11,7 +11,7 @@ import java.util.Map;
  * Represents a context in which properties
  * can be loaded, modified and saves.
  */
-public class Context implements RawContext {
+public class Context {
 
     // the configuration provider
     final ConfigurationProvider provider;

@@ -4,10 +4,7 @@ import net.orbyfied.aspen.annotation.Defaults;
 import net.orbyfied.aspen.annotation.Docs;
 import net.orbyfied.aspen.annotation.MinMax;
 import net.orbyfied.aspen.components.ValueConstraints;
-import net.orbyfied.aspen.context.ComposeContext;
-import net.orbyfied.aspen.context.OptionComposeContext;
-import net.orbyfied.aspen.context.ProfileLoadOperation;
-import net.orbyfied.aspen.context.ProfileEmitOperation;
+import net.orbyfied.aspen.context.*;
 import net.orbyfied.aspen.properties.NumberProperty;
 import net.orbyfied.aspen.properties.SimpleProperty;
 import net.orbyfied.aspen.raw.RawProvider;
@@ -428,6 +425,14 @@ public class ConfigurationProvider {
      */
     public Context newEmitContext(OptionProfile profile) {
         return new Context(this, new ProfileEmitOperation(profile), profile.schema());
+    }
+
+    public IOContext newReadContext(OptionProfile profile, String fileName) {
+        return new IOContext(this, profile.schema(), fileName);
+    }
+
+    public IOContext newWriteContext(OptionProfile profile, String fileName) {
+        return new IOContext(this, profile.schema(), fileName);
     }
 
     /**

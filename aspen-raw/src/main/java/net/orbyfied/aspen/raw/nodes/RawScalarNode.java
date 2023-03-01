@@ -5,11 +5,13 @@ import java.util.Objects;
 /**
  * A node which holds a value.
  */
-public class RawScalarNode<T> extends RawValueNode {
+public class RawScalarNode<T> extends RawValueNode<T> {
 
     public static <T> RawScalarNode<T> nullNode() {
         return new RawScalarNode<>(null);
     }
+
+    /////////////////////////////////////
 
     // the value of the node
     T value;
@@ -34,6 +36,11 @@ public class RawScalarNode<T> extends RawValueNode {
         return value;
     }
 
+    @SuppressWarnings("unchecked")
+    public <T2> T2 getValueAs() {
+        return (T2) value;
+    }
+
     public ValueStyle getStyle() {
         return style;
     }
@@ -46,6 +53,16 @@ public class RawScalarNode<T> extends RawValueNode {
     @Override
     public String getDataString() {
         return Objects.toString(value);
+    }
+
+    @Override
+    protected T toValue0() {
+        return value;
+    }
+
+    @Override
+    public T toValue() {
+        return value;
     }
 
 }

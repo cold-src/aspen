@@ -11,24 +11,26 @@ import java.io.Writer;
  * This is usually some kind of configuration
  * format library like SnakeYAML.
  */
-public interface RawProvider {
+public interface RawProvider<IC extends RawIOContext> {
 
     /**
      * Attempts to serialize the given node
      * tree to the writer.
      *
+     * @param context The context.
      * @param node The node.
      * @param writer The writer.
      */
-    void write(RawNode node, Writer writer);
+    void write(IC context, RawNode node, Writer writer);
 
     /**
      * Parses the input from the reader into
      * a node tree to be loaded.
      *
+     * @param context The context.
      * @param reader The reader.
      * @return The node.
      */
-    RawNode compose(Reader reader);
+    RawNode compose(IC context, Reader reader);
 
 }

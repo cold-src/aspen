@@ -1,6 +1,8 @@
 package net.orbyfied.aspen.raw;
 
 import net.orbyfied.aspen.raw.nodes.RawNode;
+import net.orbyfied.aspen.raw.source.EmissionNodeSource;
+import net.orbyfied.aspen.raw.source.ReadNodeSource;
 
 import java.io.Reader;
 import java.io.Writer;
@@ -16,11 +18,11 @@ import java.util.Map;
  * @param <N> The base node type.
  */
 @SuppressWarnings({ "rawtypes", "unchecked" })
-public abstract class NodeSpecProvider<N> implements RawProvider {
+public abstract class NodeSpecProvider<IC extends RawIOContext, N> implements RawProvider<IC> {
 
-    public interface RawTransformer<B, N extends B, R extends RawNode> {
-        N fromRaw(NodeSpecProvider<B> provider, R src, N result);
-        R toRaw(NodeSpecProvider<B> provider, N src, R result);
+    public interface RawTransformer<IC extends RawIOContext,B, N extends B, R extends RawNode> {
+        N fromRaw(IC context, NodeSpecProvider<IC, B> provider, R src, N result);
+        R toRaw(IC context, NodeSpecProvider<IC, B> provider, N src, R result);
     }
 
     // the registered transformers
@@ -29,7 +31,7 @@ public abstract class NodeSpecProvider<N> implements RawProvider {
 
     public <N1 extends N, R extends RawNode> void withTransformer(Class<N1> nClass,
                                                                   Class<R> rClass,
-                                                                  RawTransformer<N, N1, R> transformer) {
+                                                                  RawTransformer<IC, N, N1, R> transformer) {
         if (nClass != null)
             transformersByNative.computeIfAbsent(nClass, __ -> new ArrayList<>()).add(transformer);
         if (rClass != null)
@@ -37,21 +39,21 @@ public abstract class NodeSpecProvider<N> implements RawProvider {
     }
 
     /* IO */
-    protected abstract void writeTree(N node, Writer writer);
-    protected abstract N readTree(Reader reader);
+    protected abstract void writeTree(IC context, N node, Writer writer);
+    protected abstract N readTree(IC context, Reader reader);
 
     /* Base Converters */
-    protected abstract N fromRawBase(RawNode node);
-    protected abstract RawNode toRawBase(N node);
+    protected abstract N fromRawBase(IC context, RawNode node);
+    protected abstract RawNode toRawBase(IC context, N node);
 
     @Override
-    public RawNode compose(Reader reader) {
-        return toRaw(readTree(reader));
+    public RawNode compose(IC context, Reader reader) {
+        return toRaw(context, readTree(context, reader));
     }
 
     @Override
-    public void write(RawNode node, Writer writer) {
-        writeTree(fromRaw(node), writer);
+    public void write(IC context, RawNode node, Writer writer) {
+        writeTree(context, fromRaw(context, node), writer);
     }
 
     /**
@@ -61,12 +63,12 @@ public abstract class NodeSpecProvider<N> implements RawProvider {
      * @param rawNode The source node.
      * @return The result node.
      */
-    public N fromRaw(RawNode rawNode) {
-        N result = fromRawBase(rawNode);
+    public N fromRaw(IC context, RawNode rawNode) {
+        N result = fromRawBase(context, rawNode);
         List<RawTransformer> transformers = transformersByRaw.get(rawNode.getClass());
         if (transformers != null) {
             for (RawTransformer transformer : transformers) {
-                result = (N) transformer.fromRaw(this, rawNode, result);
+                result = (N) transformer.fromRaw(context, this, rawNode, result);
             }
         }
 
@@ -80,12 +82,22 @@ public abstract class NodeSpecProvider<N> implements RawProvider {
      * @param nativeNode The native node.
      * @return The raw node.
      */
-    public RawNode toRaw(N nativeNode) {
-        RawNode result = toRawBase(nativeNode);
+    public RawNode toRaw(IC context, N nativeNode) {
+        RawNode result = toRawBase(context, nativeNode);
         List<RawTransformer> transformers = transformersByNative.get(nativeNode.getClass());
         if (transformers != null) {
             for (RawTransformer transformer : transformers) {
-                result = transformer.toRaw(this, nativeNode, result);
+                result = transformer.toRaw(context, this, nativeNode, result);
+            }
+        }
+
+        System.out.println("hey guys! 1 @ " + result);
+        if (result.source() instanceof ReadNodeSource source) {
+            System.out.println("hey guys! 2 @ " + result);
+            String fn = context.fileName();
+            if (fn != null) {
+                System.out.println("hey guys! 3 @ " + result);
+                source.location().file().setName(context.fileName());
             }
         }
 

@@ -23,6 +23,15 @@ public class RawNode {
         return source;
     }
 
+    @SuppressWarnings("unchecked")
+    public <N extends RawNode> N require(Class<N> nClass) {
+        if (!nClass.isInstance(this)) {
+            throw new IllegalArgumentException("Expected " + nClass.getSimpleName() + " node, got " + getClass().getSimpleName());
+        }
+
+        return (N) this;
+    }
+
     /*
         Comments
      */

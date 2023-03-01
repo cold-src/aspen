@@ -7,43 +7,32 @@ import java.util.List;
  * A node which holds a list of values.
  */
 @SuppressWarnings("rawtypes")
-public class RawListNode extends RawValueNode {
-
-    // the list of nodes
-    final List<RawNode> nodes;
+public class RawListNode extends RawSeqNode<List<Object>> {
 
     public RawListNode() {
-        this.nodes = new ArrayList<>();
+
     }
 
     public RawListNode(List<RawNode> value) {
-        this.nodes = value;
+        super(value);
     }
 
-    public List<RawNode> getNodes() {
-        return nodes;
-    }
-
-    public RawListNode addElement(RawNode elem) {
-        nodes.add(elem);
-        return this;
-    }
-
-    /**
-     * Merge this list of nodes with
-     * the given node.
-     *
-     * @param node The node to merge with.
-     * @return The new merged node.
-     */
-    public RawListNode merge(RawListNode node) {
+    public RawListNode merge(RawSeqNode<?> node) {
         List<RawNode> nodes = new ArrayList<>(this.nodes);
         nodes.addAll(node.nodes);
         return new RawListNode(nodes);
     }
 
-    public void addAll(RawListNode node) {
-        nodes.addAll(node.nodes);
+    @Override
+    protected List<Object> toValue0() {
+        ArrayList<Object> list = new ArrayList<>();
+        for (RawNode node : nodes) {
+            if (node instanceof RawValueNode valueNode) {
+                list.add(valueNode.toValue());
+            }
+        }
+
+        return list;
     }
-    
+
 }

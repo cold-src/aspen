@@ -6,7 +6,7 @@ import net.orbyfied.aspen.context.ComposeContext;
 import net.orbyfied.aspen.context.OptionComposeContext;
 import net.orbyfied.aspen.exception.AspenException;
 import net.orbyfied.aspen.exception.SchemaComposeException;
-import net.orbyfied.aspen.raw.nodes.RawMapNode;
+import net.orbyfied.aspen.raw.nodes.RawObjectNode;
 import net.orbyfied.aspen.raw.nodes.RawNode;
 import net.orbyfied.aspen.raw.nodes.RawPairNode;
 import net.orbyfied.aspen.raw.nodes.RawScalarNode;
@@ -443,10 +443,10 @@ public abstract class Schema implements BaseRepresentable {
      */
 
     @Override
-    public RawMapNode emit(Context context) {
+    public RawObjectNode emit(Context context) {
         context.schema = this;
         Context forked = context.fork();
-        RawMapNode node = new RawMapNode();
+        RawObjectNode node = new RawObjectNode();
         for (Property property : propertyMap.values()) {
             node.putEntry(property.name, property.emit(forked));
         }
@@ -458,7 +458,7 @@ public abstract class Schema implements BaseRepresentable {
     public void load(Context context, RawNode node) {
         context.schema = this;
         Context forked = context.fork();
-        if (!(node instanceof RawMapNode mapNode))
+        if (!(node instanceof RawObjectNode mapNode))
             throw new IllegalStateException("Not a map node");
         for (RawNode node1 : mapNode.getNodes()) {
             if (node1 instanceof RawPairNode entry) {

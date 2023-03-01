@@ -2,13 +2,12 @@ package net.orbyfied.aspen.properties;
 
 import net.orbyfied.aspen.Property;
 import net.orbyfied.aspen.raw.nodes.RawListNode;
-import net.orbyfied.aspen.raw.nodes.RawMapNode;
+import net.orbyfied.aspen.raw.nodes.RawObjectNode;
 import net.orbyfied.aspen.raw.nodes.RawNode;
 
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
 
 @SuppressWarnings("rawtypes")
 public class SimpleProperty<T> extends Property<T, T> {
@@ -35,7 +34,7 @@ public class SimpleProperty<T> extends Property<T, T> {
     @SuppressWarnings("unchecked")
     protected RawNode emitValue0(T value) {
         if (value instanceof Map map) {
-            RawMapNode node = new RawMapNode();
+            RawObjectNode node = new RawObjectNode();
             map.forEach((k, v) -> {
                 node.putEntry(k, emitValue0((T) v));
             });
@@ -57,7 +56,7 @@ public class SimpleProperty<T> extends Property<T, T> {
 
     @Override
     protected T loadValue0(RawNode node) {
-        if (node instanceof RawMapNode mapNode) {
+        if (node instanceof RawObjectNode mapNode) {
             Map<String, Object> map = new HashMap<>();
         }
 

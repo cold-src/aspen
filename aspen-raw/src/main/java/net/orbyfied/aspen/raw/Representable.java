@@ -2,7 +2,7 @@ package net.orbyfied.aspen.raw;
 
 import net.orbyfied.aspen.raw.nodes.RawNode;
 
-public interface Representable<C extends RawContext> {
+public interface Representable<C> {
 
     /**
      * Emit the representable into a

@@ -1,9 +1,8 @@
 package net.orbyfied.aspen;
 
 import net.orbyfied.aspen.annotation.Options;
-import net.orbyfied.aspen.raw.nodes.RawMapNode;
+import net.orbyfied.aspen.raw.nodes.RawObjectNode;
 import net.orbyfied.aspen.raw.nodes.RawNode;
-import net.orbyfied.aspen.raw.nodes.RawScalarNode;
 import net.orbyfied.aspen.util.UnsafeUtil;
 import sun.misc.Unsafe;
 
@@ -88,8 +87,8 @@ public class OptionSchema extends Schema {
     }
 
     @Override
-    public RawMapNode emit(Context context) {
-        RawMapNode node = new RawMapNode();
+    public RawObjectNode emit(Context context) {
+        RawObjectNode node = new RawObjectNode();
         for (OptionSchema schema : providedChildren) {
             node.addAll(schema.emit(context));
         }
