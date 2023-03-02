@@ -5,6 +5,7 @@ import java.util.Objects;
 /**
  * A node which holds a value.
  */
+@SuppressWarnings("unchecked")
 public class RawScalarNode<T> extends RawValueNode<T> {
 
     public static <T> RawScalarNode<T> nullNode() {
@@ -39,6 +40,18 @@ public class RawScalarNode<T> extends RawValueNode<T> {
     @SuppressWarnings("unchecked")
     public <T2> T2 getValueAs() {
         return (T2) value;
+    }
+
+    public <T2> RawScalarNode<T2> expect(Class<T2> typeClass) {
+        if (!typeClass.isInstance(value))
+            throw new IllegalArgumentException("Value Error: expected " + typeClass + ", got " + (value == null ? "null" : value.getClass()));
+        return (RawScalarNode<T2>) this;
+    }
+
+    public <T2> RawScalarNode<T2> expectNullable(Class<T2> typeClass) {
+        if (value == null)
+            return (RawScalarNode<T2>) this;
+        return expect(typeClass);
     }
 
     public ValueStyle getStyle() {

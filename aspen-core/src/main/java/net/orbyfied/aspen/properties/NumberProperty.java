@@ -1,9 +1,11 @@
 package net.orbyfied.aspen.properties;
 
 import net.orbyfied.aspen.Property;
+import net.orbyfied.aspen.context.PropertyContext;
 import net.orbyfied.aspen.exception.PropertyExceptions;
 import net.orbyfied.aspen.raw.nodes.RawNode;
 import net.orbyfied.aspen.raw.nodes.RawScalarNode;
+import net.orbyfied.aspen.util.NumberUtil;
 
 public class NumberProperty<T extends Number> extends Property<T, Number> {
 
@@ -53,26 +55,23 @@ public class NumberProperty<T extends Number> extends Property<T, Number> {
     }
 
     @Override
-    protected RawNode emitValue0(T value) {
+    protected RawNode emitValue0(PropertyContext context, T value) {
         if (value == null)
             return RawScalarNode.nullNode();
         return new RawScalarNode<>(switch (numberType) {
-            case INT -> value.intValue();
-            case FLOAT -> value.floatValue();
+            case INT -> value.longValue();
+            case FLOAT -> value.doubleValue();
         });
     }
 
     @Override
-    @SuppressWarnings("unchecked")
-    protected T loadValue0(RawNode node) {
+    protected T loadValue0(PropertyContext context, RawNode node) {
         if (!(node instanceof RawScalarNode<?> scalarNode))
             return PropertyExceptions.failValueError("Expected scalar node, got " + node.getClass().getSimpleName());
         if (scalarNode.getValue() == null)
             return null;
-        return switch (numberType) {
-            case FLOAT -> (T) Double.valueOf(((Number)scalarNode.getValue()).doubleValue());
-            case INT -> (T) Long.valueOf(((Number)scalarNode.getValue()).longValue());
-        };
+        return NumberUtil.castBoxed(scalarNode.expectNullable(Number.class).getValue(),
+                complexType);
     }
 
 }

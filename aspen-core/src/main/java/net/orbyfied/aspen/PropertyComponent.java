@@ -1,5 +1,6 @@
 package net.orbyfied.aspen;
 
+import net.orbyfied.aspen.context.PropertyContext;
 import net.orbyfied.aspen.util.Placement;
 
 import java.util.ArrayList;
@@ -49,16 +50,16 @@ public interface PropertyComponent<T, P> {
         /* Overwrite */
 
         @Override
-        public Object checkLoadedValue(Object val) {
+        public Object checkLoadedValue(PropertyContext context, Object val) {
             for (var comp : list)
-                val = comp.checkLoadedValue(val);
+                val = comp.checkLoadedValue(context, val);
             return val;
         }
     }
 
     //////////////////////////////////
 
-    default T checkLoadedValue(T val) {
+    default T checkLoadedValue(PropertyContext context, T val) {
         return val;
     }
 

@@ -91,12 +91,9 @@ public abstract class NodeSpecProvider<IC extends RawIOContext, N> implements Ra
             }
         }
 
-        System.out.println("hey guys! 1 @ " + result);
         if (result.source() instanceof ReadNodeSource source) {
-            System.out.println("hey guys! 2 @ " + result);
             String fn = context.fileName();
             if (fn != null) {
-                System.out.println("hey guys! 3 @ " + result);
                 source.location().file().setName(context.fileName());
             }
         }

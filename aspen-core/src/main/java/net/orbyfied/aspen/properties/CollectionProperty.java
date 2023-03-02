@@ -1,6 +1,7 @@
 package net.orbyfied.aspen.properties;
 
 import net.orbyfied.aspen.Property;
+import net.orbyfied.aspen.context.PropertyContext;
 import net.orbyfied.aspen.raw.nodes.RawListNode;
 import net.orbyfied.aspen.raw.nodes.RawNode;
 
@@ -68,22 +69,22 @@ public abstract class CollectionProperty<E> extends Property<Collection<E>, List
     }
 
     @Override
-    protected RawNode emitValue0(Collection<E> value) {
+    protected RawNode emitValue0(PropertyContext context, Collection<E> value) {
         RawListNode node = new RawListNode();
         for (E elem : value) {
-            node.addElement(embedded.emitValue(elem));
+            node.addElement(embedded.emitValue(context, elem));
         }
 
         return node;
     }
 
     @Override
-    protected Collection<E> loadValue0(RawNode node) {
+    protected Collection<E> loadValue0(PropertyContext context, RawNode node) {
         if (!(node instanceof RawListNode listNode))
             throw new IllegalStateException("Not a list node");
         Collection<E> collection = newCollection();
         for (RawNode elem : listNode.getNodes()) {
-            collection.add((E) embedded.loadValue(elem));
+            collection.add((E) embedded.loadValue(context, elem));
         }
 
         return collection;

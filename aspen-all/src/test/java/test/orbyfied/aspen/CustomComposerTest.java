@@ -5,6 +5,7 @@ import net.orbyfied.aspen.OptionComposer;
 import net.orbyfied.aspen.OptionProfile;
 import net.orbyfied.aspen.PropertyComponent;
 import net.orbyfied.aspen.annotation.Option;
+import net.orbyfied.aspen.context.PropertyContext;
 import net.orbyfied.aspen.exception.ConfigurationLoadException;
 import net.orbyfied.aspen.exception.PropertyExceptions;
 import org.junit.jupiter.api.Test;
@@ -18,7 +19,7 @@ public class CustomComposerTest {
     // test component class
     static class NotNullComponent implements PropertyComponent<Object, Object> {
         @Override
-        public Object checkLoadedValue(Object val) {
+        public Object checkLoadedValue(PropertyContext context, Object val) {
             if (val == null)
                 PropertyExceptions.failIllegalValue(null, "value can not be null");
             return val;
@@ -46,8 +47,8 @@ public class CustomComposerTest {
 
         i1.nullableOption1 = null;
         i1.nullableOption2 = 400;
-        i1.notNullOption1 = null;
-        i1.notNullOption2 = 600;
+        i1.notNullOption1 = "null";
+        i1.notNullOption2 = null;
 
         profile.save();
 
@@ -63,7 +64,7 @@ public class CustomComposerTest {
 
         @Option
         @NotNullOption
-        Integer notNullOption1;
+        String notNullOption1;
 
         @Option
         @NotNullOption

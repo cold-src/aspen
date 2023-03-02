@@ -13,7 +13,6 @@ import java.lang.annotation.Target;
  *  for now use @MinMax
  */
 @Retention(RetentionPolicy.RUNTIME)
-@Target({ ElementType.FIELD, ElementType.TYPE_USE })
 public @interface Range {
 
     /**

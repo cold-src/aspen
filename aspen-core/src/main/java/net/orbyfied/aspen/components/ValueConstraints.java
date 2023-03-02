@@ -1,6 +1,8 @@
 package net.orbyfied.aspen.components;
 
 import net.orbyfied.aspen.PropertyComponent;
+import net.orbyfied.aspen.context.PropertyContext;
+import net.orbyfied.aspen.exception.PropertyExceptions;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -8,24 +10,80 @@ import java.util.List;
 @SuppressWarnings({ "rawtypes", "unchecked" })
 public class ValueConstraints implements PropertyComponent {
 
-    public static ValueConstraints minMax(double min, double max) {
-        return new ValueConstraints().with(value -> {
-            if (!(value instanceof Number number))
-                return false;
-            double asDouble = number.doubleValue();
+    public static ValueConstraints empty() {
+        return new ValueConstraints();
+    }
 
-            return asDouble >= min && asDouble <= max;
-        });
+    public static <N extends Number> Constraint<N> minMaxConstraint(double min, double max) {
+        return new Constraint() {
+            @Override
+            public boolean check(PropertyContext context, Object value) {
+                if (!(value instanceof Number number))
+                    return false;
+                double asDouble = number.doubleValue();
+
+                return asDouble >= min && asDouble <= max;
+            }
+
+            @Override
+            public String expectation(PropertyContext context) {
+                return "number must be between " + min + " and " + max;
+            }
+        };
+    }
+
+    public static ValueConstraints minMax(double min, double max) {
+        return empty().with(minMaxConstraint(min, max));
+    }
+
+    public static Constraint<Object> notNullConstraint() {
+        return new Constraint<Object>() {
+            @Override
+            public boolean check(PropertyContext context, Object value) {
+                return value != null;
+            }
+
+            @Override
+            public String expectation(PropertyContext context) {
+                return "value can not be null";
+            }
+        };
+    }
+
+    public static ValueConstraints notNull() {
+        return empty().with(notNullConstraint());
     }
 
     ///////////////////////////////////
 
     /** A constraint for checking values. */
     public interface Constraint<T> {
-        boolean check(T value);
+
+        /**
+         * Check if the given value is allowed in
+         * the current property context.
+         *
+         * @param context The context.
+         * @param value The value.
+         * @return If the value is allowed.
+         */
+        boolean check(PropertyContext context, T value);
+
+        /**
+         * Get the expectation string for this
+         * constraint.
+         *
+         * @param context The context.
+         * @return The string.
+         */
+        String expectation(PropertyContext context);
+
     }
 
-    List<Constraint> constraints = new ArrayList<>();
+    /**
+     * All constraints to apply to each value.
+     */
+    final List<Constraint> constraints = new ArrayList<>();
 
     public ValueConstraints with(Constraint constraint) {
         constraints.add(constraint);
@@ -33,10 +91,11 @@ public class ValueConstraints implements PropertyComponent {
     }
 
     @Override
-    public Object checkLoadedValue(Object val) {
+    public Object checkLoadedValue(PropertyContext context, Object val) {
         for (Constraint constraint : constraints) {
-            if (!constraint.check(val)) {
-                throw new IllegalArgumentException("Constraint prohibits value " + val);
+            if (!constraint.check(context, val)) {
+                PropertyExceptions.failIllegalValue(val,
+                        constraint.expectation(context));
             }
         }
 

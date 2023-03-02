@@ -26,7 +26,7 @@ public class Tests {
                 .composeProfile(
                         name,
                         instance,
-                        Tests.file(name + ".yml")
+                        file(name + ".yml")
                 );
     }
 

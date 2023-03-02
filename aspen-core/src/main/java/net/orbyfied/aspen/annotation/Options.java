@@ -12,7 +12,6 @@ import java.lang.annotation.Target;
  * @author orbyfied
  */
 @Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.FIELD)
 public @interface Options {
 
 }

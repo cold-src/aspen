@@ -1,6 +1,7 @@
 package net.orbyfied.aspen.properties;
 
 import net.orbyfied.aspen.Property;
+import net.orbyfied.aspen.context.PropertyContext;
 import net.orbyfied.aspen.raw.nodes.RawListNode;
 import net.orbyfied.aspen.raw.nodes.RawObjectNode;
 import net.orbyfied.aspen.raw.nodes.RawNode;
@@ -32,11 +33,11 @@ public class SimpleProperty<T> extends Property<T, T> {
 
     @Override
     @SuppressWarnings("unchecked")
-    protected RawNode emitValue0(T value) {
+    protected RawNode emitValue0(PropertyContext context, T value) {
         if (value instanceof Map map) {
             RawObjectNode node = new RawObjectNode();
             map.forEach((k, v) -> {
-                node.putEntry(k, emitValue0((T) v));
+                node.putEntry(k, emitValue0(context, (T) v));
             });
 
             return node;
@@ -45,22 +46,22 @@ public class SimpleProperty<T> extends Property<T, T> {
         if (value instanceof Collection collection) {
             RawListNode node = new RawListNode();
             collection.forEach(v -> {
-                node.addElement(emitValue0((T)v));
+                node.addElement(emitValue0(context, (T)v));
             });
 
             return node;
         }
 
-        return super.emitValue0(value);
+        return super.emitValue0(context, value);
     }
 
     @Override
-    protected T loadValue0(RawNode node) {
+    protected T loadValue0(PropertyContext context, RawNode node) {
         if (node instanceof RawObjectNode mapNode) {
             Map<String, Object> map = new HashMap<>();
         }
 
-        return super.loadValue0(node);
+        return super.loadValue0(context, node);
     }
 
 }

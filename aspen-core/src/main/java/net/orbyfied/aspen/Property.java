@@ -332,7 +332,7 @@ public class Property<T, P> implements BaseRepresentable {
     }
 
     // load value impl
-    protected T loadValue0(RawNode node) {
+    protected T loadValue0(PropertyContext context, RawNode node) {
         if (!(node instanceof RawScalarNode<?> scalarNode))
             return PropertyExceptions.failValueError("Non-scalar node given to load as primitive");
         return valueFromPrimitive((P) scalarNode.getValue());
@@ -344,17 +344,19 @@ public class Property<T, P> implements BaseRepresentable {
      * Utilizes {@link #valueFromPrimitive(Object)}
      * to convert the saved value by default.
      *
+     *
+     * @param context The context.
      * @param node The node.
      * @return The value.
      */
-    public T loadValue(RawNode node) {
+    public T loadValue(PropertyContext context, RawNode node) {
         try {
-            T val = loadValue0(node);
+            T val = loadValue0(context, node);
 
             // pass through components
             if (componentMap != null) {
                 for (PropertyComponent component : componentMap.values()) {
-                    component.checkLoadedValue(val);
+                    component.checkLoadedValue(context, val);
                 }
             }
 
@@ -365,7 +367,7 @@ public class Property<T, P> implements BaseRepresentable {
     }
 
     // emit value impl
-    protected RawNode emitValue0(T value) {
+    protected RawNode emitValue0(PropertyContext context, T value) {
         P primitiveValue = valueToPrimitive(value);
         return new RawScalarNode<>(primitiveValue);
     }
@@ -376,16 +378,17 @@ public class Property<T, P> implements BaseRepresentable {
      * Utilizes {@link #valueToPrimitive(Object)}
      * to convert the value by default.
      *
+     * @param context The context.
      * @param value The value.
      * @return The node.
      */
-    public RawNode emitValue(T value) {
-        return emitValue0(value);
+    public RawNode emitValue(PropertyContext context, T value) {
+        return emitValue0(context, value);
     }
 
     @Override
     public RawNode emit(Context context) {
-        RawNode node = emitValue(get(getPropertyContextOrLocal(context)));
+        RawNode node = emitValue(localContext, get(getPropertyContextOrLocal(context)));
         if (commenter != null)
             commenter.accept(node);
         return node;
@@ -393,7 +396,7 @@ public class Property<T, P> implements BaseRepresentable {
 
     @Override
     public void load(Context context, RawNode node) {
-        set(getPropertyContextOrLocal(context), loadValue(node));
+        set(getPropertyContextOrLocal(context), loadValue(localContext, node));
     }
 
     public RawNode emit() {

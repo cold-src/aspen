@@ -8,7 +8,6 @@ import java.lang.annotation.Target;
 // may be temporary, to be replaced by
 // a proper implementation of @Range
 @Retention(RetentionPolicy.RUNTIME)
-@Target({ ElementType.FIELD, ElementType.TYPE_USE })
 public @interface MinMax {
 
     double min();
