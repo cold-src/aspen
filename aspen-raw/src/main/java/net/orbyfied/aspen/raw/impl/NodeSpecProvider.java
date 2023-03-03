@@ -1,7 +1,8 @@
-package net.orbyfied.aspen.raw;
+package net.orbyfied.aspen.raw.impl;
 
+import net.orbyfied.aspen.raw.RawIOContext;
+import net.orbyfied.aspen.raw.RawProvider;
 import net.orbyfied.aspen.raw.nodes.RawNode;
-import net.orbyfied.aspen.raw.source.EmissionNodeSource;
 import net.orbyfied.aspen.raw.source.ReadNodeSource;
 
 import java.io.Reader;

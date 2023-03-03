@@ -8,11 +8,14 @@ import net.orbyfied.aspen.context.*;
 import net.orbyfied.aspen.properties.NumberProperty;
 import net.orbyfied.aspen.properties.SimpleProperty;
 import net.orbyfied.aspen.raw.RawProvider;
+import net.orbyfied.aspen.raw.format.JLSSFormat;
+import net.orbyfied.aspen.raw.format.StringScalarFormat;
 import net.orbyfied.aspen.raw.nodes.RawNode;
 import net.orbyfied.aspen.util.Pair;
 import net.orbyfied.aspen.util.Throwables;
 
 import java.lang.reflect.AnnotatedElement;
+import java.lang.reflect.Field;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -166,9 +169,6 @@ public class ConfigurationProvider {
 
     ///////////////////////////////////
 
-    /* settings */
-    boolean processAnnotations = true;
-
     // the raw provider to use
     private RawProvider rawProvider = null;
 
@@ -201,6 +201,77 @@ public class ConfigurationProvider {
 
     /* Settings */
 
+    boolean settingProcessAnnotations = true;
+
+    // TODO: settings system
+    //  for now we just use fields
+    //  but for more customization maybe in
+    //  the future allow Property-based custom settings
+
+    private Field findSettingField(String name) {
+        try {
+            String s = Character.toLowerCase(name.charAt(0)) +
+                    name.substring(1);
+
+            Field f = getClass().getDeclaredField("setting" + s);
+            f.setAccessible(true);
+            return f;
+        } catch (NoSuchFieldException e) {
+            throw new IllegalArgumentException("No setting by name '" + name + "' in impl " +
+                    getClass().getSimpleName());
+        }
+    }
+
+    /*
+        Current Settings:
+
+     */
+
+    /**
+     * Put a settings value by name, will
+     * throw an error if the settings is absent.
+     *
+     * @param name The settings name.
+     * @param value The value to set.
+     * @throws IllegalArgumentException If there is no setting by the given name.
+     * @return This.
+     */
+    public ConfigurationProvider setting(String name, Object value) {
+        try {
+            findSettingField(name).set(this, value);
+            return this;
+        } catch (Exception e) {
+            Throwables.sneakyThrow(e);
+            return this;
+        }
+    }
+
+    /**
+     * Get a settings value by name, will
+     * throw an error if the settings is absent.
+     *
+     * @param name The settings name.
+     * @throws IllegalArgumentException If there is no setting by the given name.
+     * @return The value.
+     */
+    public <T> T setting(String name) {
+        try {
+            return (T) findSettingField(name).get(this);
+        } catch (Exception e) {
+            Throwables.sneakyThrow(e);
+            return null;
+        }
+    }
+
+    public ConfigurationProvider processAnnotations(boolean b) {
+        this.settingProcessAnnotations = b;
+        return this;
+    }
+
+    public boolean processAnnotations() {
+        return settingProcessAnnotations;
+    }
+
     public ConfigurationProvider rawProvider(RawProvider provider) {
         this.rawProvider = provider;
         return this;
@@ -208,15 +279,6 @@ public class ConfigurationProvider {
 
     public RawProvider rawProvider() {
         return rawProvider;
-    }
-
-    public ConfigurationProvider processAnnotations(boolean b) {
-        this.processAnnotations = b;
-        return this;
-    }
-
-    public boolean processAnnotations() {
-        return processAnnotations;
     }
 
     /**
@@ -451,10 +513,11 @@ public class ConfigurationProvider {
         ConfigurationProvider res = new ConfigurationProvider();
 
         res.rawProvider = rawProvider;
-        res.processAnnotations = processAnnotations;
+        res.settingProcessAnnotations = settingProcessAnnotations;
         res.schemaComposers = new ArrayList<>(schemaComposers);
         res.optionComposers = new ArrayList<>(optionComposers);
         res.propertyBehaviourMap = new HashMap<>(propertyBehaviourMap);
+        res.rawTransformers = new ArrayList<>(rawTransformers);
 
         return res;
     }

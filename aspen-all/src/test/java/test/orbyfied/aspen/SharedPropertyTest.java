@@ -1,16 +1,11 @@
 package test.orbyfied.aspen;
 
-import net.orbyfied.aspen.NodeTransformer;
 import net.orbyfied.aspen.OptionProfile;
 import net.orbyfied.aspen.PropertyAccess;
 import net.orbyfied.aspen.annotation.Docs;
 import net.orbyfied.aspen.properties.SimpleProperty;
-import net.orbyfied.aspen.raw.nodes.RawNode;
-import net.orbyfied.aspen.raw.nodes.RawScalarNode;
-import net.orbyfied.aspen.raw.nodes.ValueStyle;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.yaml.snakeyaml.nodes.ScalarNode;
 
 public class SharedPropertyTest {
 

@@ -1,5 +1,7 @@
 package net.orbyfied.aspen.raw.nodes;
 
+import net.orbyfied.aspen.raw.format.ScalarStyle;
+
 import java.util.Objects;
 
 /**
@@ -18,7 +20,7 @@ public class RawScalarNode<T> extends RawValueNode<T> {
     T value;
 
     // the value style of this node
-    ValueStyle style = ValueStyle.PLAIN;
+    ScalarStyle style = null;
 
     public RawScalarNode() { }
 
@@ -54,11 +56,11 @@ public class RawScalarNode<T> extends RawValueNode<T> {
         return expect(typeClass);
     }
 
-    public ValueStyle getStyle() {
+    public ScalarStyle getStyle() {
         return style;
     }
 
-    public RawScalarNode<T> setStyle(ValueStyle style) {
+    public RawScalarNode<T> setStyle(ScalarStyle style) {
         this.style = style;
         return this;
     }

@@ -1,7 +1,10 @@
 package net.orbyfied.aspen.raw;
 
+import net.orbyfied.aspen.raw.format.StringScalarFormat;
+import net.orbyfied.aspen.raw.format.StringScalarRepresentation;
+import net.orbyfied.aspen.raw.impl.NodeSpecProvider;
+import net.orbyfied.aspen.raw.impl.StringScalarProvider;
 import net.orbyfied.aspen.raw.nodes.*;
-import net.orbyfied.aspen.raw.source.NodeSource;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
@@ -16,7 +19,6 @@ import java.io.Reader;
 import java.io.Writer;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
 import static net.orbyfied.aspen.raw.YamlSupport.*;
 
@@ -24,7 +26,10 @@ import static net.orbyfied.aspen.raw.YamlSupport.*;
  * An {@link NodeSpecProvider} which utilizes SnakeYAML.
  */
 @SuppressWarnings({ "unchecked", "rawtypes" })
-public class YamlRawProvider extends NodeSpecProvider<RawIOContext, Node> {
+public class YamlRawProvider
+        extends NodeSpecProvider<RawIOContext, Node>
+        implements StringScalarProvider<RawIOContext>
+{
 
     public static Builder builder() {
         return new Builder();
@@ -38,10 +43,11 @@ public class YamlRawProvider extends NodeSpecProvider<RawIOContext, Node> {
         Representer representer;
         LoaderOptions loaderOptions = new LoaderOptions();
         DumperOptions dumperOptions = new DumperOptions();
-        DumperOptions.ScalarStyle mapKeyStyle;
-        DumperOptions.FlowStyle mapFlowStyle;
-        DumperOptions.FlowStyle listFlowStyle;
-        boolean spacedComments;
+        DumperOptions.ScalarStyle mapKeyStyle = DumperOptions.ScalarStyle.PLAIN;
+        DumperOptions.FlowStyle mapFlowStyle = DumperOptions.FlowStyle.AUTO;
+        DumperOptions.FlowStyle listFlowStyle = DumperOptions.FlowStyle.AUTO;
+        boolean spacedComments = true;
+        StringScalarFormat stringScalarFormat;
 
         {
             loaderOptions.setProcessComments(true);
@@ -120,18 +126,35 @@ public class YamlRawProvider extends NodeSpecProvider<RawIOContext, Node> {
             return this;
         }
 
+        public StringScalarFormat getStringScalarFormat() {
+            return stringScalarFormat;
+        }
+
+        public Builder setStringScalarFormat(StringScalarFormat stringScalarFormat) {
+            this.stringScalarFormat = stringScalarFormat;
+            return this;
+        }
+
+        /**
+         * Builds the instance.
+         */
         public YamlRawProvider build() {
             if (constructor == null)
                 constructor = new Constructor(loaderOptions);
             if (representer == null)
                 representer = new Representer(dumperOptions);
-            return new YamlRawProvider(
-                    new Yaml(constructor, representer, dumperOptions, loaderOptions),
-                    mapKeyStyle,
-                    mapFlowStyle,
-                    listFlowStyle,
-                    spacedComments
+
+            YamlRawProvider i = new YamlRawProvider(
+                    new Yaml(constructor, representer, dumperOptions, loaderOptions)
             );
+
+            // set properties
+            i.mapKeyStyle = mapKeyStyle;
+            i.mapFlowStyle = mapFlowStyle;
+            i.listFlowStyle = listFlowStyle;
+            i.spacedComments = spacedComments;
+
+            return i;
         }
 
     }
@@ -146,18 +169,26 @@ public class YamlRawProvider extends NodeSpecProvider<RawIOContext, Node> {
     DumperOptions.FlowStyle mapFlowStyle;
     DumperOptions.FlowStyle listFlowStyle;
     boolean spacedComments;
+    StringScalarFormat stringScalarFormat;
 
-    YamlRawProvider(Yaml yaml,
-                    DumperOptions.ScalarStyle mapKeyStyle,
-                    DumperOptions.FlowStyle mapFlowStyle,
-                    DumperOptions.FlowStyle listFlowStyle,
-                    boolean spacedComments) {
+    /*
+        TODO: fix bug with saving scalar style
+         which causes it to not be applied idk
+         why that happens but it does for some
+         fucking reason im explicitly setting the
+         style on the fucking node stupid snakeyaml
+         but no that not enough i probably have to
+         extend or configure some stupid serializer
+         object or something idk
+     */
+
+    YamlRawProvider(Yaml yaml) {
         this.yaml = yaml;
+    }
 
-        this.mapKeyStyle = mapKeyStyle;
-        this.mapFlowStyle = mapFlowStyle;
-        this.listFlowStyle = listFlowStyle;
-        this.spacedComments = spacedComments;
+    @Override
+    public StringScalarFormat stringScalarFormat() {
+        return stringScalarFormat;
     }
 
     @Override
@@ -185,10 +216,16 @@ public class YamlRawProvider extends NodeSpecProvider<RawIOContext, Node> {
         return out;
     }
 
-    org.yaml.snakeyaml.nodes.Node addComments(RawNode src, org.yaml.snakeyaml.nodes.Node res) {
+    org.yaml.snakeyaml.nodes.Node putProperties(RawNode src, org.yaml.snakeyaml.nodes.Node res) {
+        // comments //
         if (src.blockCommentLines() != null) res.setBlockComments(toCommentLines(src.blockCommentLines(), CommentType.BLOCK));
         if (src.inLineCommentLines() != null) res.setInLineComments(toCommentLines(src.inLineCommentLines(), CommentType.IN_LINE));
         if (src.endCommentLines() != null) res.setEndComments(toCommentLines(src.endCommentLines(), CommentType.BLOCK));
+
+        if (res instanceof ScalarNode scalarNode) {
+            System.out.println("dumped scalar yaml(" + res + ") style(" + scalarNode.getScalarStyle() + ")");
+        }
+
         return res;
     }
 
@@ -209,7 +246,7 @@ public class YamlRawProvider extends NodeSpecProvider<RawIOContext, Node> {
             }
 
             MappingNode mappingNode = new MappingNode(Tag.MAP, true, outList, null, null, mapFlowStyle);
-            return addComments(rawNode, mappingNode);
+            return putProperties(rawNode, mappingNode);
         }
 
         // list node
@@ -220,22 +257,15 @@ public class YamlRawProvider extends NodeSpecProvider<RawIOContext, Node> {
             }
 
             SequenceNode sequenceNode = new SequenceNode(Tag.SEQ, true, values, null, null, listFlowStyle);
-            return addComments(rawNode, sequenceNode);
+            return putProperties(rawNode, sequenceNode);
         }
 
         // scalar node
         if (rawNode instanceof RawScalarNode valueNode) {
-            Object value = valueNode.getValue();
-            if (value == null)
-                return addComments(rawNode, new ScalarNode(Tag.NULL, "null", null, null,
-                        toScalarStyle(valueNode.getStyle())));
-
-            // represent value
-            Tag tag; Class<?> vt = valueNode.getValue().getClass();
-            tag = getScalarTypeTag(vt);
-
-            return addComments(rawNode, new ScalarNode(tag, Objects.toString(value), null, null,
-                    toScalarStyle(valueNode.getStyle())));
+            StringScalarRepresentation repr = stringScalarFormat()
+                    .dump(valueNode);
+            return putProperties(rawNode, new ScalarNode(Tag.STR, repr.string(), null, null,
+                    toYamlScalarStyle(repr.style())));
         }
 
         throw new IllegalArgumentException("Unsupported node " + rawNode.getClass());
@@ -273,15 +303,14 @@ public class YamlRawProvider extends NodeSpecProvider<RawIOContext, Node> {
 
         // value node
         if (yamlNode instanceof ScalarNode scalarNode) {
-            NodeSource source = newNodeSource(scalarNode.getStartMark());
-            if (yamlNode.getTag() == Tag.NULL)
-                return new RawScalarNode<>(null).source(source);
-            String strValue = scalarNode.getValue();
+            StringScalarRepresentation repr = new StringScalarRepresentation(
+                    scalarNode.getValue(),
+                    fromYamlScalarStyle(scalarNode.getScalarStyle())
+            );
 
-            if (scalarNode.isPlain() && strValue.equalsIgnoreCase("null"))
-                return new RawScalarNode<>(null).source(source);
-
-            return new RawScalarNode<>(yaml.load(strValue)).source(source);
+            RawScalarNode<?> rawScalarNode = new RawScalarNode<>();
+            stringScalarFormat().load(repr, rawScalarNode);
+            return rawScalarNode.source(newNodeSource(scalarNode.getStartMark()));
         }
 
         // throw exception

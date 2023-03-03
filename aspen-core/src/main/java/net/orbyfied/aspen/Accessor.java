@@ -147,7 +147,7 @@ public interface Accessor<T> {
     static <T> Accessor<T> sharedMutable() {
         return new Accessor<>() {
             // the value cache
-            Map<Schema, T> valueMap = new HashMap<>();
+            final Map<Schema, T> valueMap = new HashMap<>();
 
             @Override
             public T get(PropertyContext context) {

@@ -1,6 +1,6 @@
 package net.orbyfied.aspen.raw;
 
-import net.orbyfied.aspen.raw.nodes.ValueStyle;
+import net.orbyfied.aspen.raw.format.ScalarStyle;
 import net.orbyfied.aspen.raw.source.FileInfo;
 import net.orbyfied.aspen.raw.source.FileLocation;
 import net.orbyfied.aspen.raw.source.NodeSource;
@@ -9,19 +9,37 @@ import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.error.Mark;
 import org.yaml.snakeyaml.nodes.Tag;
 
+/**
+ * SnakeYAML utility methods.
+ */
 public class YamlSupport {
 
     public static NodeSource newNodeSource(Mark a) {
         if (a == null)
             return new ReadNodeSource();
-        return new ReadNodeSource().location(new FileLocation(new FileInfo().setName(a.getName()), a.getLine(), a.getColumn()));
+        return new ReadNodeSource()
+                .location(new FileLocation(
+                        new FileInfo().setName(a.getName()),
+                        a.getLine(),
+                        a.getColumn()
+                ));
     }
 
-    public static DumperOptions.ScalarStyle toScalarStyle(ValueStyle style) {
+    public static DumperOptions.ScalarStyle toYamlScalarStyle(ScalarStyle style) {
         return switch (style) {
             case PLAIN -> DumperOptions.ScalarStyle.PLAIN;
             case SINGLE_QUOTED -> DumperOptions.ScalarStyle.SINGLE_QUOTED;
             case DOUBLE_QUOTED -> DumperOptions.ScalarStyle.DOUBLE_QUOTED;
+        };
+    }
+
+    public static ScalarStyle fromYamlScalarStyle(DumperOptions.ScalarStyle style) {
+        return switch (style) {
+            case PLAIN -> ScalarStyle.PLAIN;
+            case SINGLE_QUOTED -> ScalarStyle.SINGLE_QUOTED;
+            case DOUBLE_QUOTED -> ScalarStyle.DOUBLE_QUOTED;
+
+            default -> throw new IllegalArgumentException("" + style);
         };
     }
 
