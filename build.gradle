@@ -2,6 +2,10 @@ group 'net.orbyfied.aspen'
 
 ext {
 
+    // java
+    languageVersion = '18'
+    releaseVersion = '18'
+
     // minecraft
     paperVersion = "1.19.2-R0.1-20221119.041019-155"
 

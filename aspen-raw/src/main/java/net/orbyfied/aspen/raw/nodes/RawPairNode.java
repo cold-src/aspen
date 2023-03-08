@@ -2,6 +2,7 @@ package net.orbyfied.aspen.raw.nodes;
 
 import java.util.Map;
 
+@RawNodeTypeDesc(typeName = "pair")
 public class RawPairNode extends RawValueNode {
 
     RawNode key;
@@ -34,8 +35,8 @@ public class RawPairNode extends RawValueNode {
     @Override
     protected Object toValue0() {
         return Map.entry(
-                key.require(RawValueNode.class).toValue(),
-                value.require(RawValueNode.class).toValue()
+                key.expect(RawValueNode.class).toValue(),
+                value.expect(RawValueNode.class).toValue()
         );
     }
 

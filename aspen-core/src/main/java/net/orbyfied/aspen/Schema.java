@@ -6,10 +6,10 @@ import net.orbyfied.aspen.context.ComposeContext;
 import net.orbyfied.aspen.context.OptionComposeContext;
 import net.orbyfied.aspen.exception.AspenException;
 import net.orbyfied.aspen.exception.SchemaComposeException;
-import net.orbyfied.aspen.raw.nodes.RawObjectNode;
-import net.orbyfied.aspen.raw.nodes.RawNode;
-import net.orbyfied.aspen.raw.nodes.RawPairNode;
-import net.orbyfied.aspen.raw.nodes.RawScalarNode;
+import net.orbyfied.aspen.raw.nodes.*;
+import net.orbyfied.aspen.raw.source.FileLocation;
+import net.orbyfied.aspen.raw.source.NodeSource;
+import net.orbyfied.aspen.raw.source.ReadNodeSource;
 
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Constructor;
@@ -166,7 +166,7 @@ public abstract class Schema implements BaseRepresentable {
             withProperty(property);
         }
 
-        return ((SectionProperty) property).get();
+        return (SectionSchema) ((SectionProperty) property).get();
     }
 
     /**
@@ -459,15 +459,22 @@ public abstract class Schema implements BaseRepresentable {
         context.schema = this;
         Context forked = context.fork();
         if (!(node instanceof RawObjectNode mapNode))
-            throw new IllegalStateException("Not a map node");
-        for (RawNode node1 : mapNode.getNodes()) {
-            if (node1 instanceof RawPairNode entry) {
-                Property property = getProperty(((RawScalarNode<String>)entry.getKey()).getValue());
-                if (property == null)
-                    continue;
+            throw new IllegalStateException("Not a section/object/map node");
 
-                property.load(forked, entry.getValue());
+        final ReadNodeSource vrNodeSource = new ReadNodeSource();
+        if (node.source() instanceof ReadNodeSource readNodeSource) {
+            vrNodeSource.location(readNodeSource.location());
+        }
+
+        Map<String, RawNode> mapped = mapNode.toMap();
+        for (Property property : propertyMap.values()) {
+            RawNode n = mapped.get(property.getName());
+            if (n == null) {
+                n = RawUndefinedNode.undefined()
+                        .source(vrNodeSource);
             }
+
+            property.load(forked, n);
         }
     }
 

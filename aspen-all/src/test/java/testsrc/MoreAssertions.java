@@ -1,4 +1,4 @@
-package test.orbyfied.aspen;
+package testsrc;
 
 import org.junit.jupiter.api.Assertions;
 

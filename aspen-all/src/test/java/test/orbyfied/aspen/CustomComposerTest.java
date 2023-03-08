@@ -6,13 +6,12 @@ import net.orbyfied.aspen.OptionProfile;
 import net.orbyfied.aspen.PropertyComponent;
 import net.orbyfied.aspen.annotation.Option;
 import net.orbyfied.aspen.context.PropertyContext;
-import net.orbyfied.aspen.exception.ConfigurationLoadException;
 import net.orbyfied.aspen.exception.PropertyExceptions;
 import org.junit.jupiter.api.Test;
+import testsrc.Tests;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
-import java.nio.file.Files;
 
 public class CustomComposerTest {
 

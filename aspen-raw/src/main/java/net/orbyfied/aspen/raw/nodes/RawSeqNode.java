@@ -3,6 +3,7 @@ package net.orbyfied.aspen.raw.nodes;
 import java.util.ArrayList;
 import java.util.List;
 
+@RawNodeTypeDesc(typeName = "seq")
 public abstract class RawSeqNode<V> extends RawValueNode<V> {
 
     // the list of nodes

@@ -1,4 +1,4 @@
-package test.orbyfied.aspen;
+package testsrc;
 
 import net.orbyfied.aspen.ConfigurationProvider;
 import net.orbyfied.aspen.OptionProfile;
@@ -21,7 +21,10 @@ public class Tests {
             );
 
     public static OptionProfile compose(Object instance) {
-        String name = instance.getClass().getSimpleName().toLowerCase();
+        Class<?> cl = instance.getClass();
+        String name = cl.getSimpleName().toLowerCase();
+        if (cl.getDeclaringClass() != null)
+            name = cl.getDeclaringClass().getSimpleName() + "$" + name;
         return Tests.configurationProvider()
                 .composeProfile(
                         name,

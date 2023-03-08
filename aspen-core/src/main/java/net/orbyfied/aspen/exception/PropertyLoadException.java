@@ -2,7 +2,7 @@ package net.orbyfied.aspen.exception;
 
 import net.orbyfied.aspen.Property;
 import net.orbyfied.aspen.raw.nodes.RawNode;
-import net.orbyfied.aspen.util.IOFormatting;
+import net.orbyfied.aspen.raw.util.RawFormatting;
 
 /**
  * An exception which occurs when loading a property.
@@ -57,7 +57,7 @@ public class PropertyLoadException extends AspenException {
         if (property != null)
             builder.append("\n  in property(" + property.getPath() + ")");
         builder.append("\n  ");
-        IOFormatting.formatNodeSource(builder, node);
+        RawFormatting.formatNodeSource(builder, node);
         return builder.toString();
     }
 

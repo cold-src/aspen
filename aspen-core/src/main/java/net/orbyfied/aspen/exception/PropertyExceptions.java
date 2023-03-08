@@ -7,6 +7,8 @@ import org.jetbrains.annotations.Contract;
  */
 public class PropertyExceptions {
 
+    /* Exception Classes */
+
     public static class ValueException extends RuntimeException {
         public ValueException(String message) {
             super(message);
@@ -24,6 +26,8 @@ public class PropertyExceptions {
             super(message, cause, enableSuppression, writableStackTrace);
         }
     }
+
+    /* Factory Methods */
 
     public static ValueException newValueError(String str) {
         return new ValueException(str);

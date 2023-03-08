@@ -7,6 +7,7 @@ import java.util.List;
  * A node which holds a list of values.
  */
 @SuppressWarnings("rawtypes")
+@RawNodeTypeDesc(typeName = "list")
 public class RawListNode extends RawSeqNode<List<Object>> {
 
     public RawListNode() {

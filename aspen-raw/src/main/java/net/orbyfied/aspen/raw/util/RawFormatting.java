@@ -1,4 +1,4 @@
-package net.orbyfied.aspen.util;
+package net.orbyfied.aspen.raw.util;
 
 import net.orbyfied.aspen.raw.nodes.RawNode;
 import net.orbyfied.aspen.raw.source.NodeSource;
@@ -7,7 +7,7 @@ import net.orbyfied.aspen.raw.source.NodeSource;
  * Formatting utilities for property input and
  * output with raw nodes.
  */
-public class IOFormatting {
+public class RawFormatting {
 
     public static void formatNodeSource(StringBuilder b, NodeSource source) {
         if (source == null)

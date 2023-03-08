@@ -3,6 +3,7 @@ package net.orbyfied.aspen.raw.nodes;
 /**
  * A node which holds a value.
  */
+@RawNodeTypeDesc(typeName = "value")
 public abstract class RawValueNode<V> extends RawNode {
 
     // if we have a cached value

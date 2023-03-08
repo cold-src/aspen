@@ -5,6 +5,7 @@ import net.orbyfied.aspen.exception.PropertyExceptions;
 import net.orbyfied.aspen.exception.PropertyLoadException;
 import net.orbyfied.aspen.raw.nodes.RawNode;
 import net.orbyfied.aspen.raw.nodes.RawScalarNode;
+import net.orbyfied.aspen.raw.nodes.RawUndefinedNode;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -388,7 +389,10 @@ public class Property<T, P> implements BaseRepresentable {
 
     @Override
     public RawNode emit(Context context) {
-        RawNode node = emitValue(localContext, get(getPropertyContextOrLocal(context)));
+        PropertyContext c = getPropertyContextOrLocal(context);
+        if (!has(c))
+            return RawScalarNode.undefined();
+        RawNode node = emitValue(c, get(c));
         if (commenter != null)
             commenter.accept(node);
         return node;
@@ -396,7 +400,8 @@ public class Property<T, P> implements BaseRepresentable {
 
     @Override
     public void load(Context context, RawNode node) {
-        set(getPropertyContextOrLocal(context), loadValue(localContext, node));
+        PropertyContext c = getPropertyContextOrLocal(context);
+        set(c, loadValue(c, node));
     }
 
     public RawNode emit() {

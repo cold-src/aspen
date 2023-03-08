@@ -1,6 +1,7 @@
 package net.orbyfied.aspen.raw.format;
 
 import net.orbyfied.aspen.raw.nodes.RawScalarNode;
+import net.orbyfied.aspen.raw.nodes.RawValueNode;
 
 /**
  * Specifies how to parse and dump scalars
@@ -11,29 +12,21 @@ public interface StringScalarFormat {
 
     /**
      * Load a scalar value using the
-     * given string and style read.
+     * given string and style read into
+     * the given node.
      *
      * @param representation The read representation.
-     * @return The value.
+     * @return The node.
      */
-    Object load(StringScalarRepresentation representation);
+    RawValueNode<?> load(StringScalarRepresentation representation);
 
     /**
-     * Dump the given scalar value into
+     * Dump the value of the given scalar into
      * an output string and style to write.
      *
-     * @param value The value.
+     * @param node The node.
      * @return The output.
      */
-    StringScalarRepresentation dump(Object value);
-
-    default void load(StringScalarRepresentation representation,
-                      RawScalarNode node) {
-        node.setValue(load(representation));
-    }
-
-    default StringScalarRepresentation dump(RawScalarNode<?> node) {
-        return dump(node.getValue());
-    }
+    StringScalarRepresentation dump(RawValueNode<?> node);
 
 }

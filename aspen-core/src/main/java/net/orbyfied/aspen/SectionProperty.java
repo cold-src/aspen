@@ -1,6 +1,9 @@
 package net.orbyfied.aspen;
 
+import net.orbyfied.aspen.context.PropertyContext;
+import net.orbyfied.aspen.exception.PropertyExceptions;
 import net.orbyfied.aspen.raw.nodes.RawNode;
+import net.orbyfied.aspen.raw.nodes.RawObjectNode;
 import net.orbyfied.aspen.raw.nodes.RawScalarNode;
 import net.orbyfied.aspen.util.Throwables;
 
@@ -11,9 +14,9 @@ import java.lang.reflect.Constructor;
  * a section.
  */
 @SuppressWarnings({ "unchecked", "rawtypes" })
-public class SectionProperty extends Property<SectionSchema, Void> {
+public class SectionProperty extends Property<Schema, Void> {
 
-    public static Builder<SectionSchema, Void, SectionProperty> virtual(
+    public static Builder<Schema, Void, SectionProperty> virtual(
             ConfigurationProvider provider,
             Schema parent,
             String name
@@ -23,7 +26,7 @@ public class SectionProperty extends Property<SectionSchema, Void> {
                 .provider(provider);
     }
 
-    public static Builder<SectionSchema, Void, SectionProperty> builder(
+    public static Builder<Schema, Void, SectionProperty> builder(
             ConfigurationProvider provider,
             Schema parent,
             String name,
@@ -61,13 +64,18 @@ public class SectionProperty extends Property<SectionSchema, Void> {
     }
 
     @Override
-    public void load(Context context, RawNode node) {
-        get().load(context, node);
+    protected Schema loadValue0(PropertyContext context, RawNode node) {
+        node.expect(RawObjectNode.class);
+
+        Schema schema = get(context);
+        schema.load(context, node);
+        return schema;
     }
 
     @Override
-    public RawNode emit(Context context) {
-        return get().emit(context);
+    protected RawNode emitValue0(PropertyContext context, Schema value) {
+        Schema schema = get(context);
+        return schema.emit(context);
     }
 
 }

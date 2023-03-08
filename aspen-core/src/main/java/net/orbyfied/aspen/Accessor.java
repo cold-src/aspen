@@ -70,8 +70,8 @@ public interface Accessor<T> {
         final Unsafe unsafe = UnsafeUtil.getUnsafe();
         final long offset = unsafe.objectFieldOffset(field);
         return new Accessor<>() {
-            // if a value has been set
-            boolean set = false;
+//            // if a value has been set
+//            boolean set = false;
 
             @Override
             public T get(PropertyContext context) {
@@ -81,12 +81,12 @@ public interface Accessor<T> {
             @Override
             public void register(PropertyContext context, T value) {
                 unsafe.putObjectVolatile(source.instance, offset, value);
-                set = true;
+//                set = true;
             }
 
             @Override
             public boolean has(PropertyContext context) {
-                return set;
+                return true;
             }
         };
     }

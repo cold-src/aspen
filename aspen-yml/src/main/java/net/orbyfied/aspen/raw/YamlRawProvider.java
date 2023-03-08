@@ -1,5 +1,6 @@
 package net.orbyfied.aspen.raw;
 
+import net.orbyfied.aspen.raw.format.JLSSFormat;
 import net.orbyfied.aspen.raw.format.StringScalarFormat;
 import net.orbyfied.aspen.raw.format.StringScalarRepresentation;
 import net.orbyfied.aspen.raw.impl.NodeSpecProvider;
@@ -47,7 +48,7 @@ public class YamlRawProvider
         DumperOptions.FlowStyle mapFlowStyle = DumperOptions.FlowStyle.AUTO;
         DumperOptions.FlowStyle listFlowStyle = DumperOptions.FlowStyle.AUTO;
         boolean spacedComments = true;
-        StringScalarFormat stringScalarFormat;
+        StringScalarFormat stringScalarFormat = new JLSSFormat();
 
         {
             loaderOptions.setProcessComments(true);
@@ -153,6 +154,7 @@ public class YamlRawProvider
             i.mapFlowStyle = mapFlowStyle;
             i.listFlowStyle = listFlowStyle;
             i.spacedComments = spacedComments;
+            i.stringScalarFormat = stringScalarFormat;
 
             return i;
         }
@@ -268,6 +270,14 @@ public class YamlRawProvider
                     toYamlScalarStyle(repr.style())));
         }
 
+        // undefined node
+        if (rawNode instanceof RawUndefinedNode valueNode) {
+            StringScalarRepresentation repr = stringScalarFormat()
+                    .dump(valueNode);
+            return putProperties(rawNode, new ScalarNode(Tag.STR, repr.string(), null, null,
+                    toYamlScalarStyle(repr.style())));
+        }
+
         throw new IllegalArgumentException("Unsupported node " + rawNode.getClass());
     }
 
@@ -308,8 +318,8 @@ public class YamlRawProvider
                     fromYamlScalarStyle(scalarNode.getScalarStyle())
             );
 
-            RawScalarNode<?> rawScalarNode = new RawScalarNode<>();
-            stringScalarFormat().load(repr, rawScalarNode);
+            RawValueNode<?> rawScalarNode = stringScalarFormat()
+                    .load(repr);
             return rawScalarNode.source(newNodeSource(scalarNode.getStartMark()));
         }
 

@@ -1,5 +1,9 @@
 package net.orbyfied.aspen.raw.format;
 
+import net.orbyfied.aspen.raw.nodes.RawScalarNode;
+import net.orbyfied.aspen.raw.nodes.RawUndefinedNode;
+import net.orbyfied.aspen.raw.nodes.RawValueNode;
+
 import java.util.Objects;
 
 /**
@@ -8,7 +12,9 @@ import java.util.Objects;
  *
  * Standard:
  *   Style(Plain):
- *   - "null"        = null
+ *   - null          = null
+ *   - undefined     = undefined
+ *   - { empty }     = undefined
  *   - [0-9]+        = long
  *   - [0-9\\.]+     = double
  *   - (true)(false) = boolean
@@ -20,6 +26,7 @@ import java.util.Objects;
  *   Style(Double Quoted):
  *   - * = string
  */
+@SuppressWarnings("rawtypes")
 public final class JLSSFormat implements StringScalarFormat {
 
     // the style to use for
@@ -35,9 +42,45 @@ public final class JLSSFormat implements StringScalarFormat {
         return stringDumpStyle;
     }
 
-    public StringScalarRepresentation dumpScalar(Object in) {
-        System.out.println("JLSS dumpScalar in(" + in + ") in.class(" +
-                (in == null ? null : in.getClass()) + ")");
+    @Override
+    public RawValueNode<?> load(StringScalarRepresentation repr) {
+        String string = repr.string();
+        ScalarStyle style = repr.style();
+
+        if (string == null)
+            return RawScalarNode.nullNode();
+        if (style == ScalarStyle.PLAIN &&
+                (string.equals("undefined") || string.isBlank()))
+            return RawUndefinedNode.undefined();
+
+        return new RawScalarNode<>(switch (style) {
+            case PLAIN -> // switch literals
+                    switch (string) {
+                        case "null" -> null;
+                        case "true" -> true;
+                        case "false" -> false;
+                        default -> {
+                            try {
+                                double numResult = Double.parseDouble(string);
+                                if (numResult % 1 == 0) // produce long if an integer
+                                    yield (long) numResult;
+                                else yield numResult;
+                            } catch (NumberFormatException ignored) { }
+
+                            // yield string literal
+                            yield string;
+                        }
+                    };
+
+            case SINGLE_QUOTED, DOUBLE_QUOTED -> string;
+        });
+    }
+
+    @Override
+    public StringScalarRepresentation dump(RawValueNode<?> node) {
+        if (node instanceof RawUndefinedNode)
+            return new StringScalarRepresentation("undefined", ScalarStyle.PLAIN);
+        Object in = ((RawScalarNode)node).getValue();
         if (in == null)
             return new StringScalarRepresentation("null", ScalarStyle.PLAIN);
         if (in instanceof Boolean bool)
@@ -52,51 +95,4 @@ public final class JLSSFormat implements StringScalarFormat {
 
         return new StringScalarRepresentation(Objects.toString(in), stringDumpStyle);
     }
-
-    public Object parseScalar(StringScalarRepresentation repr) {
-        String string = repr.string();
-        ScalarStyle style = repr.style();
-
-        if (string == null)
-            return null;
-
-        switch (style) {
-            case PLAIN -> {
-                // switch literals
-                return switch (string) {
-                    case "null"  -> null;
-                    case "true"  -> true;
-                    case "false" -> false;
-                    default -> {
-                        try {
-                            double numResult = Double.parseDouble(string);
-                            if (numResult % 1 == 0) // produce long if an integer
-                                yield (long) numResult;
-                            else yield numResult;
-                        } catch (NumberFormatException ignored) { }
-
-                        // yield string literal
-                        yield string;
-                    }
-                };
-            }
-
-            case SINGLE_QUOTED, DOUBLE_QUOTED -> {
-                return string;
-            }
-        }
-
-        throw new IllegalArgumentException();
-    }
-
-    @Override
-    public Object load(StringScalarRepresentation representation) {
-        return parseScalar(representation);
-    }
-
-    @Override
-    public StringScalarRepresentation dump(Object value) {
-        return dumpScalar(value);
-    }
-
 }

@@ -3,6 +3,7 @@ package net.orbyfied.aspen.raw.impl;
 import net.orbyfied.aspen.raw.RawIOContext;
 import net.orbyfied.aspen.raw.RawProvider;
 import net.orbyfied.aspen.raw.nodes.RawNode;
+import net.orbyfied.aspen.raw.nodes.RawUndefinedNode;
 import net.orbyfied.aspen.raw.source.ReadNodeSource;
 
 import java.io.Reader;
@@ -65,6 +66,9 @@ public abstract class NodeSpecProvider<IC extends RawIOContext, N> implements Ra
      * @return The result node.
      */
     public N fromRaw(IC context, RawNode rawNode) {
+        if (rawNode == null)
+            return null;
+
         N result = fromRawBase(context, rawNode);
         List<RawTransformer> transformers = transformersByRaw.get(rawNode.getClass());
         if (transformers != null) {
@@ -84,6 +88,9 @@ public abstract class NodeSpecProvider<IC extends RawIOContext, N> implements Ra
      * @return The raw node.
      */
     public RawNode toRaw(IC context, N nativeNode) {
+        if (nativeNode == null)
+            return RawUndefinedNode.undefined();
+
         RawNode result = toRawBase(context, nativeNode);
         List<RawTransformer> transformers = transformersByNative.get(nativeNode.getClass());
         if (transformers != null) {

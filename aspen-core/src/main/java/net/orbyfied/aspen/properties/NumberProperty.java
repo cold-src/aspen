@@ -66,11 +66,10 @@ public class NumberProperty<T extends Number> extends Property<T, Number> {
 
     @Override
     protected T loadValue0(PropertyContext context, RawNode node) {
-        if (!(node instanceof RawScalarNode<?> scalarNode))
-            return PropertyExceptions.failValueError("Expected scalar node, got " + node.getClass().getSimpleName());
+        RawScalarNode<?> scalarNode = node.expect(RawScalarNode.class);
         if (scalarNode.getValue() == null)
             return null;
-        return NumberUtil.castBoxed(scalarNode.expectNullable(Number.class).getValue(),
+        return NumberUtil.castBoxed(scalarNode.expectValueNullable(Number.class).getValue(),
                 complexType);
     }
 

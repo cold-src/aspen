@@ -113,12 +113,12 @@ public class RawNodes {
 
         @Override
         public Section<String> object(String key) {
-            return nodeToObjectSection(node.toMap().get(key).require(RawObjectNode.class));
+            return nodeToObjectSection(node.toMap().get(key).expect(RawObjectNode.class));
         }
 
         @Override
         public Section<Integer> list(String key) {
-            return nodeToListSection(node.toMap().get(key).require(RawListNode.class));
+            return nodeToListSection(node.toMap().get(key).expect(RawListNode.class));
         }
     }
 
@@ -169,12 +169,12 @@ public class RawNodes {
 
         @Override
         public Section<String> object(Integer key) {
-            return nodeToObjectSection(node.getElement(key).require(RawObjectNode.class));
+            return nodeToObjectSection(node.getElement(key).expect(RawObjectNode.class));
         }
 
         @Override
         public Section<Integer> list(Integer key) {
-            return nodeToListSection(node.getElement(key).require(RawListNode.class));
+            return nodeToListSection(node.getElement(key).expect(RawListNode.class));
         }
     }
 

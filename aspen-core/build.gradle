@@ -24,6 +24,7 @@ ext {
 apply from: '../buildsrc/module.gradle', to: project
 
 dependencies {
+    api project(":aspen-base")
     api project(":aspen-raw")
     implementation project(":aspen-util")
 

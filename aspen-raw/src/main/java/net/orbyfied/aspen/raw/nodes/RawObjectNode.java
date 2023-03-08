@@ -6,6 +6,7 @@ import java.util.*;
  * A node which holds a section, object or just map.
  */
 @SuppressWarnings("unchecked")
+@RawNodeTypeDesc(typeName = "object")
 public class RawObjectNode extends RawSeqNode<Map<String, Object>> {
 
     // the cached map
@@ -55,8 +56,8 @@ public class RawObjectNode extends RawSeqNode<Map<String, Object>> {
         for (RawNode node : nodes) {
             if (node instanceof RawPairNode pairNode) {
                 map.put(
-                        (String) pairNode.getKey().require(RawScalarNode.class).getValueAs(),
-                        pairNode.getValue().require(RawValueNode.class).toValue()
+                        (String) pairNode.getKey().expect(RawScalarNode.class).getValueAs(),
+                        pairNode.getValue().expect(RawValueNode.class).toValue()
                 );
             }
         }

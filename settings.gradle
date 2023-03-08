@@ -20,3 +20,5 @@ include 'aspen-yml'
 include 'aspen-util'
 
 include 'aspen-all'
+include 'aspen-base'
+

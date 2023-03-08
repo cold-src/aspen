@@ -8,6 +8,7 @@ import net.orbyfied.aspen.annotation.Option;
 import net.orbyfied.aspen.properties.SimpleProperty;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import testsrc.Tests;
 
 public class VirtualSectionTest {
 
